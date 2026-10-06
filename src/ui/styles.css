@@ -23,6 +23,8 @@
   --agent-soft: #ebe2fc;
   --user: #127a5a;
   --user-soft: #d6f3e8;
+  --edit: #2fb56e;
+  --edit-soft: #dcf6e7;
   --focus: #2f6fdf;
   --shadow: 0 1px 2px rgb(16 24 40 / 0.08);
   --shadow-lg: -8px 0 24px rgb(16 24 40 / 0.12);
@@ -54,6 +56,8 @@
     --agent-soft: #2f2548;
     --user: #5fd3a9;
     --user-soft: #173a2f;
+    --edit: #7ee2a8;
+    --edit-soft: #1b3a2a;
     --focus: #7aa8ff;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-lg: -8px 0 24px rgb(0 0 0 / 0.45);
@@ -689,35 +693,33 @@ textarea {
   gap: 0.75rem;
 }
 
-.tabs {
+.body-field {
+  position: relative;
+}
+
+.body-field .preview {
+  padding-right: 2.5rem;
+}
+
+.body-edit {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
   display: flex;
-  align-items: flex-end;
-  gap: 0.25rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0.3rem;
+  border-radius: 6px;
+  color: var(--edit);
 }
 
-.tab {
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
-  background: transparent;
-  padding: 0.25rem 0.75rem;
+.body-edit:hover:not(:disabled) {
+  background: var(--edit-soft);
+  color: var(--edit);
+}
+
+.preview-empty {
   color: var(--text-muted);
-  margin-bottom: -1px;
-}
-
-.tab.is-active {
-  background: var(--surface);
-  border-color: var(--border);
-  color: var(--text);
-  font-weight: 600;
-}
-
-.tabs-note {
-  margin-left: auto;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  padding-bottom: 0.25rem;
+  font-style: italic;
+  padding: 0.75rem 0.85rem;
 }
 
 .body-input {

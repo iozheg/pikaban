@@ -45,8 +45,10 @@ export function TaskEditor(props: TaskEditorProps) {
   const [s, dispatch] = useReducer(editorReducer, initial, initEditor);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"write" | "preview">("write");
+  // The body shows as rendered Markdown until the user clicks Edit.
+  const [editing, setEditing] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const dirty = isDirty(s);
   const gone = s.conflict ? s.conflict.current === null : s.disk?.task === null;
@@ -57,6 +59,11 @@ export function TaskEditor(props: TaskEditorProps) {
   useEffect(() => onDirtyChange(dirty), [dirty]);
   useEffect(() => () => onDirtyChange(false), []);
   useEffect(() => titleRef.current?.focus(), []);
+  useEffect(() => {
+    if (!editing || !bodyRef.current) return;
+    bodyRef.current.setSelectionRange(0, 0);
+    bodyRef.current.focus();
+  }, [editing]);
 
   const requestClose = () => {
     if (dirty && !confirm("Discard your unsaved changes?")) return;
@@ -93,6 +100,7 @@ export function TaskEditor(props: TaskEditorProps) {
     try {
       const saved = await api.patchTask(pid, base.id, patch, etag);
       dispatch({ type: "saved", task: saved });
+      setEditing(false);
       onTask(saved);
     } catch (err) {
       if (isConflict(err)) {
@@ -134,6 +142,12 @@ export function TaskEditor(props: TaskEditorProps) {
     setError(null);
   }
 
+  /** Puts the body back as it was and shows the rendered view. Other fields keep their edits. */
+  function cancelBody() {
+    edit({ body: s.base.body });
+    setEditing(false);
+  }
+
   async function remove() {
     if (!confirm(`Delete ${base.short} "${base.title}"?\n\nThe task file is deleted.`)) return;
     setBusy(true);
@@ -165,7 +179,7 @@ export function TaskEditor(props: TaskEditorProps) {
 
   const bodyChanged = s.draft.body !== base.body;
   const willClear = bodyChanged && !s.needsTouched && base.needs_input;
-  const preview = useMemo(() => (tab === "preview" ? renderMarkdown(s.draft.body) : ""), [tab, s.draft.body]);
+  const preview = useMemo(() => (editing ? "" : renderMarkdown(s.draft.body)), [editing, s.draft.body]);
   // During a conflict the fields stay editable: the user can merge the disk text into the draft, then "Use mine".
   const locked = busy;
 
@@ -232,17 +246,18 @@ export function TaskEditor(props: TaskEditorProps) {
             void save();
           }}
         >
-          <label class="field">
-            <span class="field-label">Title</span>
+          <div class="field">
             <input
               ref={titleRef}
               type="text"
+              aria-label="Title"
+              placeholder="Title"
               value={s.draft.title}
               required
               readOnly={locked}
               onInput={(e) => edit({ title: e.currentTarget.value })}
             />
-          </label>
+          </div>
 
           <div class="field-row">
             <label class="field">
@@ -292,37 +307,31 @@ export function TaskEditor(props: TaskEditorProps) {
             </p>
           </div>
 
-          <div class="field">
-            <div class="tabs" role="tablist" aria-label="Body">
+          <div class="field body-field">
+            {!editing && (
               <button
                 type="button"
-                role="tab"
-                aria-selected={tab === "write"}
-                class={tab === "write" ? "tab is-active" : "tab"}
-                onClick={() => setTab("write")}
+                class="icon-button body-edit"
+                onClick={() => setEditing(true)}
+                aria-label="Edit the body"
+                title="Edit"
               >
-                Write
+                <PencilIcon />
               </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === "preview"}
-                class={tab === "preview" ? "tab is-active" : "tab"}
-                onClick={() => setTab("preview")}
-              >
-                Preview
-              </button>
-              <span class="tabs-note">Markdown</span>
-            </div>
-            {tab === "write" ? (
+            )}
+            {editing ? (
               <textarea
+                ref={bodyRef}
                 class="body-input"
                 aria-label="Body (Markdown)"
+                placeholder="Description (Markdown)"
                 value={s.draft.body}
                 readOnly={locked}
                 spellcheck
                 onInput={(e) => edit({ body: e.currentTarget.value })}
               />
+            ) : s.draft.body.trim() === "" ? (
+              <div class="preview preview-empty">No description.</div>
             ) : (
               <div class="markdown preview" dangerouslySetInnerHTML={{ __html: preview }} />
             )}
@@ -338,9 +347,16 @@ export function TaskEditor(props: TaskEditorProps) {
             <button type="submit" class="primary" disabled={!dirty || busy || s.conflict !== null || gone}>
               {busy ? "Saving…" : "Save"}
             </button>
-            <button type="button" onClick={requestClose}>
-              Close
-            </button>
+            {/* During a conflict the notice has its own "Use mine" and "Discard mine". */}
+            {editing && !s.conflict ? (
+              <button type="button" disabled={busy} onClick={cancelBody}>
+                Cancel
+              </button>
+            ) : (
+              <button type="button" onClick={requestClose}>
+                Close
+              </button>
+            )}
             <span class="spacer" />
             <button type="button" class="danger" disabled={busy || gone || s.conflict !== null} onClick={() => void remove()}>
               Delete
@@ -357,6 +373,15 @@ export function TaskEditor(props: TaskEditorProps) {
         {s.conflict?.current && <DiskVersion task={s.conflict.current} />}
       </div>
     </aside>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
   );
 }
 
