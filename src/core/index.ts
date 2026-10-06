@@ -9,3 +9,5 @@ export * from "./globalConfig.js";
 export * from "./check.js";
 export * from "./migrate.js";
 export * from "./init.js";
+export * from "./categories.js";
+export * from "./git.js";

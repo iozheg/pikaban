@@ -48,8 +48,8 @@ describe("prepareInit and initProject", () => {
   });
 
   it("uses name, id and categories", () => {
-    const config = prepareInit(root, { name: "N", id: "i", categories: ["a", "in_progress", "done"] });
-    expect(config).toMatchObject({ project_name: "N", project_id: "i", categories: ["a", "in_progress", "done"] });
+    const config = prepareInit(root, { name: "N", id: "i", categories: ["a", "todo", "in_progress", "done"] });
+    expect(config).toMatchObject({ project_name: "N", project_id: "i", categories: ["a", "todo", "in_progress", "done"] });
   });
 
   it("stops with code 1 if .tracker/ exists, in the checks and in the write", () => {

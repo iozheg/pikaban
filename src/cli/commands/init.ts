@@ -1,16 +1,25 @@
 import { existsSync } from "node:fs";
-import { isAbsolute, relative } from "node:path";
+import { dirname, isAbsolute, relative } from "node:path";
 import { Option, type Command } from "commander";
 import {
+  addGitExcludes,
   addProject,
+  CATEGORY_DESCRIPTIONS,
+  categoriesWith,
+  DEFAULT_OPTIONAL_CATEGORIES,
+  excludePattern,
   EXIT_GENERAL,
   EXIT_USAGE,
+  findGitRepo,
   initProject,
+  OPTIONAL_CATEGORIES,
   prepareInit,
   projectPaths,
   readGlobalConfig,
   TRACKER_DIR,
   TrackerError,
+  type GitRepo,
+  type OptionalCategory,
   type ProjectConfig,
 } from "../../core/index.js";
 import {
@@ -43,17 +52,32 @@ export interface InitCommandOptions {
   skill?: string;
   /** `--allow` (true) or `--no-allow` (false). Undefined if neither is given. */
   allow?: boolean;
+  /** `--backlog` / `--no-backlog`. Undefined if neither is given. */
+  backlog?: boolean;
+  /** `--review` / `--no-review`. Undefined if neither is given. */
+  review?: boolean;
+  /** `--git` (keep the tracker files in git) / `--no-git` (add them to .git/info/exclude). */
+  git?: boolean;
   /** `--yes`: the default for each question without a flag, and no confirmation. */
   yes?: boolean;
 }
 
-/** The answers to the questions of design 5.1 (without the deferred git question). */
+/** The answers to the questions of design 5.1. */
 export interface InitAnswers {
+  /** The optional categories to turn on. */
+  categories: OptionalCategory[];
   skill: SkillChoice;
   allow: boolean;
+  /** True: keep the tracker files in git. False: add them to .git/info/exclude. Null: not in a git repository. */
+  git: boolean | null;
 }
 
-export const INIT_DEFAULTS: InitAnswers = { skill: "project", allow: false };
+export const INIT_DEFAULTS: Readonly<InitAnswers & { git: boolean }> = {
+  categories: [...DEFAULT_OPTIONAL_CATEGORIES],
+  skill: "project",
+  allow: false,
+  git: true,
+};
 
 export interface InitDeps {
   /** Default: stdin and stdout are a TTY, and not `--json`. */
@@ -69,11 +93,50 @@ export interface InitRunResult {
   answers: InitAnswers;
   skill: SkillInstallResult | null;
   permission: PermissionResult | null;
+  /** The patterns that were added to .git/info/exclude ("no" to the git question). */
+  gitExcludes: string[];
 }
 
 export const SKILL_QUESTION = "Install the agent skill? project = <project>/.claude/skills/tracker, user = ~/.claude/skills/tracker";
 export const ALLOW_QUESTION = `Let the agent run tracker without permission prompts? Adds "${PERMISSION_RULE}" to .claude/settings.json`;
+export const CATEGORIES_QUESTION = "Optional categories (todo, in_progress and done are always on):";
+export const GIT_QUESTION = "Keep the tracker files in git? no = add them to .git/info/exclude";
 export const CONFIRM_QUESTION = "Write these changes?";
+
+/** The list of the optional categories and the question. Empty gives the default. */
+async function askCategories(ask: Ask, def: readonly OptionalCategory[]): Promise<OptionalCategory[]> {
+  const width = Math.max(...OPTIONAL_CATEGORIES.map((c) => c.length));
+  const items = OPTIONAL_CATEGORIES.map(
+    (c) => `  [${def.includes(c) ? "x" : " "}] ${c.padEnd(width)}  ${CATEGORY_DESCRIPTIONS[c]}`,
+  );
+  const shown = def.length === 0 ? "none" : def.join(",");
+  const question = `${CATEGORIES_QUESTION}\n${items.join("\n")}\nCategories to turn on (${OPTIONAL_CATEGORIES.join(",")} or none) [${shown}]: `;
+  for (let i = 0; i < 3; i++) {
+    const a = (await ask(question)).trim().toLowerCase();
+    if (a === "") return [...def];
+    if (a === "none") return [];
+    const picked = parseCategoryList(a);
+    if (picked !== null) return picked;
+  }
+  throw new TrackerError(EXIT_USAGE, `no valid answer. Use ${OPTIONAL_CATEGORIES.join(", ")} (separated by commas) or none.`);
+}
+
+/** `backlog,review`, `b r` and the like, in board order. Null for an unknown name. */
+function parseCategoryList(answer: string): OptionalCategory[] | null {
+  const picked = new Set<OptionalCategory>();
+  for (const word of answer.split(/[\s,]+/).filter((w) => w !== "")) {
+    const match = OPTIONAL_CATEGORIES.filter((c) => c.startsWith(word));
+    if (match.length !== 1) return null;
+    picked.add(match[0]!);
+  }
+  return OPTIONAL_CATEGORIES.filter((c) => picked.has(c));
+}
+
+/** The optional categories from `--backlog` / `--review` (each flag without a value keeps the default). */
+function categoriesFromFlags(opts: InitCommandOptions): OptionalCategory[] {
+  const on = (c: OptionalCategory, flag: boolean | undefined) => flag ?? INIT_DEFAULTS.categories.includes(c);
+  return OPTIONAL_CATEGORIES.filter((c) => on(c, c === "backlog" ? opts.backlog : opts.review));
+}
 
 /**
  * Resolves the answers from the flags, `--yes` or questions (plan step 9, steps 2 and 3).
@@ -81,18 +144,29 @@ export const CONFIRM_QUESTION = "Write these changes?";
  */
 export async function resolveInitAnswers(
   opts: InitCommandOptions,
-  io: { interactive: boolean; ask?: Ask },
+  io: { interactive: boolean; ask?: Ask; gitRepo?: boolean },
 ): Promise<InitAnswers> {
   if (opts.skill !== undefined && !(SKILL_CHOICES as readonly string[]).includes(opts.skill)) {
     throw new TrackerError(EXIT_USAGE, `invalid --skill "${opts.skill}". Use ${SKILL_CHOICES.join(", ")}.`);
   }
   let skill = opts.skill as SkillChoice | undefined;
   let allow = opts.allow;
+  // Categories and git have safe defaults: without a terminal, a missing flag gives the default.
+  const askable = io.interactive && io.ask !== undefined && !opts.yes;
+  const categories =
+    askable && opts.backlog === undefined && opts.review === undefined
+      ? await askCategories(io.ask!, INIT_DEFAULTS.categories)
+      : categoriesFromFlags(opts);
   if (opts.yes) {
     skill ??= INIT_DEFAULTS.skill;
     allow ??= INIT_DEFAULTS.allow;
   }
-  if (skill !== undefined && allow !== undefined) return { skill, allow };
+  const gitAnswer = async (): Promise<boolean | null> => {
+    if (!io.gitRepo) return null;
+    if (opts.git !== undefined) return opts.git;
+    return askable ? askYesNo(io.ask!, GIT_QUESTION, INIT_DEFAULTS.git) : INIT_DEFAULTS.git;
+  };
+  if (skill !== undefined && allow !== undefined) return { categories, skill, allow, git: await gitAnswer() };
 
   if (!io.interactive || io.ask === undefined) {
     const missing: string[] = [];
@@ -106,20 +180,23 @@ export async function resolveInitAnswers(
   }
   skill ??= await askChoice(io.ask, SKILL_QUESTION, SKILL_CHOICES, INIT_DEFAULTS.skill);
   allow ??= await askYesNo(io.ask, ALLOW_QUESTION, INIT_DEFAULTS.allow);
-  return { skill, allow };
+  return { categories, skill, allow, git: await gitAnswer() };
 }
 
 interface Preflight {
+  /** The config with the default categories. The answers change the categories. */
   config: ProjectConfig;
   /** True if the project is already in the global config. */
   listed: boolean;
+  /** The git repository of the project folder, or null. */
+  repo: GitRepo | null;
 }
 
 /** The checks before the questions (codes 1, 3, 7). Writes nothing. */
 function preflight(root: string, opts: InitCommandOptions, homeDir: string): Preflight {
   const config = prepareInit(root, { name: opts.name, id: opts.id });
   const listed = readGlobalConfig(homeDir).projects.includes(projectPaths(root).root); // code 7
-  return { config, listed };
+  return { config, listed, repo: findGitRepo(projectPaths(root).root) };
 }
 
 interface Step {
@@ -132,7 +209,7 @@ interface Step {
 
 /**
  * The init sequence (plan step 9). The project folder is `-C <path>` or the current folder (no
- * search up). It never asks about git and never runs git (the git question is deferred).
+ * search up). It never runs git: for "no" to the git question it writes .git/info/exclude.
  */
 export async function runInit(ctx: Context, opts: InitCommandOptions, deps: InitDeps = {}): Promise<InitRunResult> {
   const interactive = deps.interactive ?? (!ctx.json && isInteractive());
@@ -145,7 +222,7 @@ export async function runInit(ctx: Context, opts: InitCommandOptions, deps: Init
 async function initSequence(
   ctx: Context,
   opts: InitCommandOptions,
-  { config, listed }: Preflight,
+  { config: defaults, listed, repo }: Preflight,
   interactive: boolean,
   ask: Ask | undefined,
 ): Promise<InitRunResult> {
@@ -153,7 +230,8 @@ async function initSequence(
   const root = paths.root;
 
   // 2-3. Answers.
-  const answers = await resolveInitAnswers(opts, { interactive, ask });
+  const answers = await resolveInitAnswers(opts, { interactive, ask, gitRepo: repo !== null });
+  const config: ProjectConfig = { ...defaults, categories: categoriesWith(answers.categories) };
 
   // Find what each step will do. A skill conflict or invalid settings JSON stops here (no writes).
   const skillScope = answers.skill === "none" ? null : answers.skill;
@@ -163,9 +241,14 @@ async function initSequence(
   if (skillPlan?.status === "conflict") {
     throw skillConflictError(skillPlan, `${skillInstallCommand(skillScope!, { force: true, root })}\nOr run tracker init with --skill none.`);
   }
-  // The permission rule always goes into <project>/.claude/settings.json (git question deferred).
+  // The permission rule always goes into <project>/.claude/settings.json.
   const settings = settingsFile(root);
   const rulePresent = answers.allow ? hasPermissionRule(readSettings(settings)) : false; // code 7
+  // "no" to git: .tracker/ and the project skill folder go into .git/info/exclude.
+  const excludes =
+    repo && answers.git === false
+      ? [paths.trackerDir, ...(skillScope === "project" ? [dirname(skillFile(root))] : [])].map((p) => excludePattern(repo, p))
+      : [];
 
   // 4. Summary and confirmation.
   const show = (file: string): string => {
@@ -176,6 +259,7 @@ async function initSequence(
     const lines = [`tracker init will make these changes in ${root}:`];
     lines.push(
       `  - make ${TRACKER_DIR}/ with config.json (project_id: ${config.project_id}, project_name: ${config.project_name}) and tasks/`,
+      `  - categories: ${config.categories.join(", ")}`,
     );
     lines.push(listed ? "  - the project is already in the global config" : `  - add the project to ${ctx.homeDir}/.tracker_config.json`);
     if (!skillPlan) lines.push("  - no agent skill (--skill none)");
@@ -186,6 +270,9 @@ async function initSequence(
     if (!answers.allow) lines.push("  - no permission rule (--no-allow)");
     else if (rulePresent) lines.push(`  - the permission rule "${PERMISSION_RULE}" is already in ${show(settings)}`);
     else lines.push(`  - add the permission rule "${PERMISSION_RULE}" to ${show(settings)}`);
+    if (!repo) lines.push("  - not in a git repository: no git changes");
+    else if (answers.git) lines.push("  - keep the tracker files in git (git is not run: commit them yourself)");
+    else lines.push(`  - add ${excludes.join(", ")} to ${show(repo.excludeFile)}`);
     process.stdout.write(`${lines.join("\n")}\n`);
   }
   if (interactive && ask && !opts.yes && !(await askYesNo(ask, CONFIRM_QUESTION, false))) {
@@ -193,11 +280,12 @@ async function initSequence(
   }
 
   // 5-7. The writes.
-  const done: { registered: boolean; skill: SkillInstallResult | null; permission: PermissionResult | null } = {
-    registered: false,
-    skill: null,
-    permission: null,
-  };
+  const done: {
+    registered: boolean;
+    skill: SkillInstallResult | null;
+    permission: PermissionResult | null;
+    gitExcludes: string[];
+  } = { registered: false, skill: null, permission: null, gitExcludes: [] };
   const steps: Step[] = [
     {
       done: `made ${paths.trackerDir}`,
@@ -235,6 +323,15 @@ async function initSequence(
       },
     });
   }
+  if (repo && excludes.length > 0) {
+    steps.push({
+      done: "added the git exclude patterns",
+      fix: `add ${excludes.join(" and ")} to ${repo.excludeFile}`,
+      run: () => {
+        done.gitExcludes = addGitExcludes(repo, excludes);
+      },
+    });
+  }
   for (const [i, step] of steps.entries()) {
     try {
       step.run();
@@ -246,22 +343,31 @@ async function initSequence(
   }
 
   // 8. Report.
-  const { registered, skill, permission } = done;
+  const { registered, skill, permission, gitExcludes } = done;
   const result: InitRunResult = {
     project: { root, config, configFile: paths.configFile },
     registered,
     answers,
     skill,
     permission,
+    gitExcludes,
   };
   ctx.out.result(result, () => {
     const lines = [
       `Initialized ${paths.trackerDir}`,
       `project_id: ${config.project_id}, project_name: ${config.project_name}`,
+      `categories: ${config.categories.join(", ")}`,
       registered ? "Added the project to the global config." : "The project is already in the global config.",
       skill ? describeSkillResult(skill, show) : "No agent skill installed (--skill none).",
     ];
     if (permission) lines.push(describePermissionResult(permission, show));
+    if (repo && answers.git === false) {
+      lines.push(
+        gitExcludes.length > 0
+          ? `Added ${gitExcludes.join(", ")} to ${show(repo.excludeFile)}.`
+          : `The tracker files are already in ${show(repo.excludeFile)}.`,
+      );
+    }
     lines.push('Next: tracker add "<title>"');
     return lines.join("\n");
   });
@@ -283,7 +389,8 @@ export function register(program: Command): void {
     .command("init")
     .description(
       "make .tracker/ and config.json in the project folder (-C or the current folder), install the skill " +
-        "and the permission rule. Without a terminal, give --skill and --allow/--no-allow, or --yes",
+        "and the permission rule. Without a terminal, give --skill and --allow/--no-allow, or --yes " +
+        "(the categories and git questions use their defaults)",
     )
     .option("--name <name>", "project name (default: the folder name)")
     .option("--id <id>", "project id (default: from the folder name)")
@@ -292,7 +399,16 @@ export function register(program: Command): void {
     )
     .option("--allow", `add "${PERMISSION_RULE}" to <project>/.claude/settings.json`)
     .option("--no-allow", "do not add the permission rule")
-    .option("--yes", "use the default for each question without a flag (--skill project, --no-allow); no confirmation")
+    .option("--backlog", "add the backlog category (default)")
+    .option("--no-backlog", "no backlog category")
+    .option("--review", "add the review category: the agent's finished tasks wait for your check")
+    .option("--no-review", "no review category (default)")
+    .option("--git", "keep the tracker files in git (default; git is not run)")
+    .option("--no-git", "add .tracker/ (and the project skill) to .git/info/exclude")
+    .option(
+      "--yes",
+      "use the default for each question without a flag (--backlog, --no-review, --skill project, --no-allow, --git); no confirmation",
+    )
     .action(async (opts: InitCommandOptions, cmd: Command) => {
       await runInit(contextOf(cmd), opts);
     });

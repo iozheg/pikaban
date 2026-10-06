@@ -3,9 +3,10 @@ import { basename } from "node:path";
 import { EXIT_GENERAL, EXIT_NOT_FOUND, TrackerError } from "./errors.js";
 import { createExclusive } from "./fs.js";
 import { projectPaths, TRACKER_DIR, type ProjectPaths } from "./project.js";
+import { categoriesWith, DEFAULT_OPTIONAL_CATEGORIES } from "./categories.js";
 import { ProjectConfigSchema, SCHEMA_VERSION, validate, type ProjectConfig } from "./schema.js";
 
-export const DEFAULT_CATEGORIES = ["backlog", "todo", "in_progress", "done"] as const;
+export const DEFAULT_CATEGORIES: readonly string[] = categoriesWith(DEFAULT_OPTIONAL_CATEGORIES);
 
 export interface InitOptions {
   /** `project_name`. Default: the folder name. */

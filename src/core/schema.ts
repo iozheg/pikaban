@@ -9,7 +9,7 @@ export const ULID_RE = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/;
 export const SHORT_RE = /^task-\d{4}$/;
 
 // Categories that the agent protocol uses (design 2.2).
-export const REQUIRED_CATEGORIES = ["in_progress", "done"] as const;
+export const REQUIRED_CATEGORIES = ["todo", "in_progress", "done"] as const;
 
 // Field order in a task file (design 2.3).
 export const TASK_FIELDS = [
@@ -38,7 +38,7 @@ export const ProjectConfigSchema = z.strictObject({
     .refine((c) => new Set(c).size === c.length, "categories must be unique")
     .refine(
       (c) => REQUIRED_CATEGORIES.every((r) => c.includes(r)),
-      `categories must contain ${REQUIRED_CATEGORIES.map((r) => `"${r}"`).join(" and ")}`,
+      `categories must contain ${REQUIRED_CATEGORIES.map((r) => `"${r}"`).join(", ")}`,
     ),
 });
 

@@ -2,6 +2,7 @@
 import { Command, Option } from "commander";
 import pkg from "../../package.json" with { type: "json" };
 import * as add from "./commands/add.js";
+import * as categories from "./commands/categories.js";
 import * as check from "./commands/check.js";
 import * as del from "./commands/delete.js";
 import * as init from "./commands/init.js";
@@ -47,7 +48,7 @@ export function buildProgram(json: boolean): Command {
         "is different, 7 validation error.",
     );
 
-  for (const cmd of [init, add, list, show, move, set, note, del, check, migrate, skill, projects, ui]) {
+  for (const cmd of [init, add, list, show, move, set, note, del, categories, check, migrate, skill, projects, ui]) {
     cmd.register(program);
   }
   return program;

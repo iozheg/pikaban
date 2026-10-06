@@ -77,14 +77,16 @@ describe("tracker init: flags", () => {
 
   it("--yes: the defaults (project skill, no permission rule)", () => {
     const out = sb.json(["init", "--yes"]);
-    expect(out.answers).toEqual({ skill: "project", allow: false });
+    expect(out.answers).toEqual({ categories: ["backlog"], skill: "project", allow: false, git: null });
     expect(existsSync(projectSkill())).toBe(true);
     expect(existsSync(projectSettings())).toBe(false);
     // A flag wins over --yes.
     const other = join(sb.dir, "other");
     mkdirSync(other);
     expect(sb.json(["init", "-C", other, "--yes", "--allow", "--skill", "none"]).answers).toEqual({
+      categories: ["backlog"],
       skill: "none",
+      git: null,
       allow: true,
     });
   });

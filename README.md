@@ -41,16 +41,19 @@ tracker add "Implement OAuth2 login" --body "Use GitHub as the first provider."
 tracker ui
 ```
 
-`tracker init` makes `.tracker/` with `config.json` and `tasks/`, and adds the project to your global project list (`~/.tracker_config.json`). In a terminal it asks two questions, shows a summary and asks for confirmation:
+`tracker init` makes `.tracker/` with `config.json` and `tasks/`, and adds the project to your global project list (`~/.tracker_config.json`). In a terminal it asks these questions, shows a summary and asks for confirmation:
 
 | Question | Answers | Default | Flag |
 |---|---|---|---|
+| Optional categories (a list of two) | `backlog`, `review` (comma-separated) or `none` | `backlog` | `--backlog` / `--no-backlog`, `--review` / `--no-review` |
 | Install the agent skill? | `project` (`<project>/.claude/skills/tracker/`), `user` (`~/.claude/skills/tracker/`), `none` | `project` | `--skill <answer>` |
 | Let the agent run `tracker` without permission prompts? | yes / no | no | `--allow` / `--no-allow` |
+| Keep the tracker files in git? (only in a git repository) | yes / no | yes | `--git` / `--no-git` |
 
-- Without a terminal (an agent, a script, CI), `tracker init` never asks. Give every flag, or `--yes` for the defaults; otherwise it stops with exit code 2 and writes nothing. Example: `tracker init --skill project --no-allow`.
+- **Categories.** `todo`, `in_progress` and `done` always exist. `backlog` (tasks for later) and `review` (the agent's finished tasks wait for your check before `done`) are optional. The board order is `backlog, todo, in_progress, review, done`. Change them later with `tracker categories enable|disable backlog|review`.
+- Without a terminal (an agent, a script, CI), `tracker init` never asks. Give `--skill` and `--allow` / `--no-allow`, or `--yes` for the defaults; otherwise it stops with exit code 2 and writes nothing. A missing category or git flag gives the default. Example: `tracker init --skill project --no-allow`.
 - `--name` and `--id` set the project name and ID (default: the folder name).
-- **Git is not touched.** The design has a question about git, but it is deferred. `tracker init` does not stage, commit or ignore anything. If you want the tasks in git, add `.tracker/` (and `.claude/skills/tracker/` for a project skill) yourself; if you do not, add them to `.gitignore` or `.git/info/exclude`.
+- **Git is never run.** "yes" to the git question changes nothing: commit `.tracker/` (and `.claude/skills/tracker/` for a project skill) when you want. "no" adds them to `.git/info/exclude` of the repository (local only, not committed, not shared with teammates). Outside a git repository there is no question.
 
 `tracker ui` starts a local server on `127.0.0.1` (port 4477, or the next free port) and opens the board in your browser. Stop it with Ctrl+C. Changes made by the CLI or by hand appear on the board in less than a second.
 
@@ -62,7 +65,7 @@ A `<ref>` is a short name (`task-0042`, `0042`, `42`) or the full 26-character U
 
 | Command | Options | What it does |
 |---|---|---|
-| `tracker init` | `--name <name>`, `--id <id>`, `--skill project\|user\|none`, `--allow` / `--no-allow`, `--yes` | Makes `.tracker/` and `config.json`, registers the project, installs the skill and the permission rule |
+| `tracker init` | `--name <name>`, `--id <id>`, `--backlog` / `--no-backlog`, `--review` / `--no-review`, `--skill project\|user\|none`, `--allow` / `--no-allow`, `--git` / `--no-git`, `--yes` | Makes `.tracker/` and `config.json`, registers the project, installs the skill and the permission rule |
 | `tracker add <title>` | `--body <text>`, `--body-file <path>` (`-` for stdin), `--category <c>` | Makes a new task (default category: the first one in `config.json`) |
 | `tracker list` | `--category <c>`, `--assignee agent\|user\|none`, `--needs-input` | Shows tasks |
 | `tracker show <ref>` | | Shows one task with its body |
@@ -70,6 +73,8 @@ A `<ref>` is a short name (`task-0042`, `0042`, `42`) or the full 26-character U
 | `tracker set <ref>` | `--title <t>`, `--assignee agent\|user\|none`, `--needs-input true\|false` | Changes frontmatter fields |
 | `tracker note <ref> [text]` | `--file <path>` (`-` for stdin) | Adds text to the end of the body |
 | `tracker delete <ref>` | | Deletes the task file |
+| `tracker categories` | | Shows the categories (on, off, required) |
+| `tracker categories enable\|disable <c>` | | Turns `backlog` or `review` on or off. Disable stops with code 1 while tasks are in the category |
 | `tracker check` | `--fix` | Validates the config, all task files and the skill version. `--fix` gives a new short name to the newer task of each duplicate pair |
 | `tracker migrate` | `--dry-run` | Changes all files to the schema version of the CLI |
 | `tracker skill install` | `--project`, `--force`, `--allow` | Installs the agent skill into `~/.claude/skills/tracker/` (or the project with `--project`) |
@@ -117,7 +122,7 @@ npm install -g tasktracker
 
 | Path | Content |
 |---|---|
-| `<project>/.tracker/config.json` | `schema_version`, `project_id`, `project_name` and `categories` (the Kanban columns; must contain `in_progress` and `done`; the first one is the default for new tasks) |
+| `<project>/.tracker/config.json` | `schema_version`, `project_id`, `project_name` and `categories` (the Kanban columns; must contain `todo`, `in_progress` and `done`; the first one is the default for new tasks) |
 | `<project>/.tracker/tasks/task-XXXX-<ULID>.md` | One file per task: YAML frontmatter (`id`, `short`, `title`, `category`, `assignee`, `needs_input`, `created_at`, `updated_at`) and a free Markdown body. Only `tracker` and the UI write the frontmatter; you and the agent can edit the body directly |
 | `~/.tracker_config.json` | The list of project folders that the UI shows |
 | `<project>/.claude/skills/tracker/SKILL.md`, `<project>/.claude/settings.json` | The project skill and the permission rule (if selected) |
