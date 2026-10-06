@@ -41,6 +41,8 @@ export interface ProjectSummary {
   status: ProjectStatus;
   /** Why the project is not available. */
   message?: string;
+  /** Null if the project is not available. */
+  config: ProjectConfig | null;
 }
 
 export interface ProjectConfig {
@@ -48,10 +50,6 @@ export interface ProjectConfig {
   project_id: string;
   project_name: string;
   categories: string[];
-}
-
-export interface ProjectDetail extends ProjectSummary {
-  config: ProjectConfig | null;
 }
 
 /** The fields that PATCH can change. */

@@ -29,7 +29,7 @@ describe("pid", () => {
 });
 
 describe("projects", () => {
-  it("GET /api/projects gives each project with its status", async () => {
+  it("GET /api/projects gives each project with its status and config", async () => {
     const a = env.project("alpha");
     const old = env.project("old");
     writeConfig(old.root, { ...openProject(old.root).config, schema_version: 0 });
@@ -52,22 +52,24 @@ describe("projects", () => {
       project_id: "alpha",
       schema_version: 1,
       status: "ok",
+      config: openProject(a.root).config,
     });
+    expect(byName.alpha.config.categories).toEqual(["backlog", "todo", "in_progress", "done"]);
     expect(byName.old.status).toBe("schema_mismatch");
     expect(byName.old.message).toContain("tracker migrate");
     expect(byName.newer.status).toBe("schema_mismatch");
     expect(byName.newer.project_id).toBeNull();
     expect(byName.broken.status).toBe("invalid");
     expect(byName.gone).toMatchObject({ pid: pidOf(missing), status: "missing", project_id: null });
+    for (const name of ["old", "newer", "broken", "gone"]) expect(byName[name].config, name).toBeNull();
   });
 
-  it("GET /api/projects/<pid> gives the config and the status", async () => {
+  it("GET /api/projects/<pid> gives 404: the list has the config", async () => {
     const a = env.project("alpha");
     server = await start(env);
     const r = await request(server.port, "GET", `/api/projects/${a.pid}`);
-    expect(r.status).toBe(200);
-    expect(r.json).toMatchObject({ pid: a.pid, status: "ok", name: "alpha" });
-    expect(r.json.config.categories).toEqual(["backlog", "todo", "in_progress", "done"]);
+    expect(r.status).toBe(404);
+    expect(r.json.error.code).toBe(3);
   });
 
   it("an unknown pid gives 404 for all project paths", async () => {

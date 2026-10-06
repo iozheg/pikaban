@@ -22,7 +22,7 @@ import {
   upsertTask,
 } from "./logic.js";
 import { loadSelectedProject, saveSelectedProject } from "./storage.js";
-import type { InvalidFile, ProjectDetail, ProjectSummary, Task, TrackerEvent } from "./types.js";
+import type { InvalidFile, ProjectSummary, Task, TrackerEvent } from "./types.js";
 import "./styles.css";
 
 interface Toast {
@@ -36,7 +36,6 @@ function App() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [pid, setPid] = useState<string | null>(null);
-  const [project, setProject] = useState<ProjectDetail | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [invalid, setInvalid] = useState<InvalidFile[]>([]);
   const [tasksError, setTasksError] = useState<string | null>(null);
@@ -60,17 +59,6 @@ function App() {
   const confirmDiscard = () => !dirtyRef.current || confirm("Discard your unsaved changes?");
 
   // --- Loads -----------------------------------------------------------------------------------
-
-  async function loadProject(p: string) {
-    try {
-      const detail = await api.project(p);
-      if (pidRef.current === p) setProject(detail);
-    } catch (err) {
-      if (pidRef.current !== p) return;
-      setProject(null);
-      setTasksError(errorMessage(err));
-    }
-  }
 
   async function loadTasks(p: string) {
     try {
@@ -109,14 +97,17 @@ function App() {
       saveSelectedProject(next);
     }
     setOpenId(null);
-    setProject(null);
     setTasks([]);
     setInvalid([]);
     setTasksError(null);
-    if (next !== null) {
-      void loadProject(next);
-      void loadTasks(next);
-    }
+    if (next !== null) void loadTasks(next);
+    return true;
+  }
+
+  /** The user selects a project. Loads the project list again too: it has the config. */
+  function chooseProject(next: string): boolean {
+    if (!selectProject(next)) return false;
+    void loadProjects();
     return true;
   }
 
@@ -139,10 +130,7 @@ function App() {
   function reloadAll() {
     void loadProjects();
     const p = pidRef.current;
-    if (p !== null) {
-      void loadProject(p);
-      void loadTasks(p);
-    }
+    if (p !== null) void loadTasks(p);
   }
 
   function onEvent(e: TrackerEvent) {
@@ -155,7 +143,6 @@ function App() {
         break;
       case "project":
         void loadProjects();
-        void loadProject(p!);
         void loadTasks(p!);
         break;
       case "task":
@@ -236,7 +223,7 @@ function App() {
   // --- Render ----------------------------------------------------------------------------------
 
   const summary = projects?.find((p) => p.pid === pid) ?? null;
-  const config = project?.status === "ok" ? project.config : null;
+  const config = summary?.status === "ok" ? summary.config : null;
   const openTaskNow = openId === null ? null : (tasks.find((t) => t.id === openId) ?? null);
 
   useEffect(() => {
@@ -247,7 +234,7 @@ function App() {
     <div class={`app${openId !== null ? " editor-open" : ""}`}>
       <header class="topbar">
         <h1 class="brand">Tracker</h1>
-        {projects && <ProjectSelector projects={projects} selected={pid} onSelect={(p) => selectProject(p)} />}
+        {projects && <ProjectSelector projects={projects} selected={pid} onSelect={chooseProject} />}
         {summary && <span class="project-root" title={summary.root}>{summary.root}</span>}
         <span class={`live live-${live}`} title="Live updates from the files on disk">
           {live === "live" ? "Live" : live === "down" ? "Reconnecting…" : "Connecting…"}

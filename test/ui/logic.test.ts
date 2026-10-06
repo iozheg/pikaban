@@ -46,7 +46,7 @@ function task(id: string, fields: Partial<Task> = {}): Task {
 }
 
 function project(pid: string, status: ProjectSummary["status"] = "ok"): ProjectSummary {
-  return { pid, root: `/p/${pid}`, name: pid, project_id: pid, schema_version: 1, status };
+  return { pid, root: `/p/${pid}`, name: pid, project_id: pid, schema_version: 1, status, config: null };
 }
 
 describe("task lists", () => {
@@ -152,7 +152,7 @@ describe("SSE events", () => {
     expect(planEvent({ type: "config", pid: "p" }, null)).toEqual({ kind: "none" });
   });
 
-  it("config: load the project again", () => {
+  it("config: load the project list and the tasks again", () => {
     expect(planEvent({ type: "config", pid: "p" }, "p")).toEqual({ kind: "project" });
   });
 

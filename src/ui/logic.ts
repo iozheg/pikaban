@@ -133,7 +133,7 @@ export function statusLabel(p: ProjectSummary): string {
 export type EventPlan =
   /** Load the project list again. */
   | { kind: "projects" }
-  /** The config of the selected project changed: load the project list, the project and its tasks. */
+  /** The config of the selected project changed: load the project list (it has the config) and the tasks. */
   | { kind: "project" }
   /** Load one task again. */
   | { kind: "task"; id: string }

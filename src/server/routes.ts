@@ -20,7 +20,7 @@ import {
   type TaskPatch,
 } from "../core/index.js";
 import { failRequest, HttpError, sendError, sendJson, sendNoContent } from "./http.js";
-import { describeProject, projectOf, rootOf } from "./projects.js";
+import { describeProject, projectOf } from "./projects.js";
 import { readJsonBody } from "./security.js";
 import type { EventHub } from "./watcher.js";
 
@@ -101,20 +101,12 @@ async function route(req: IncomingMessage, res: ServerResponse, pathname: string
 
   if (parts.length === 1) {
     requireMethod(req, ["GET"]);
-    const summaries = listProjects(ctx.homeDir).map((root) => describeProject(root).summary);
-    sendJson(res, 200, summaries);
+    sendJson(res, 200, listProjects(ctx.homeDir).map((root) => describeProject(root)));
     return;
   }
 
   const pid = parts[1]!;
   if (!PID_RE.test(pid)) throw notFound();
-
-  if (parts.length === 2) {
-    requireMethod(req, ["GET"]);
-    const { summary, config } = describeProject(rootOf(ctx.homeDir, pid));
-    sendJson(res, 200, { ...summary, config });
-    return;
-  }
   if (parts[2] !== "tasks" || parts.length > 4) throw notFound();
 
   if (parts.length === 3) {

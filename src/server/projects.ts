@@ -36,10 +36,12 @@ export interface ProjectSummary {
   status: ProjectStatus;
   /** Why the project is not available. Only if `status` is not "ok". */
   message?: string;
+  /** The project config. Null if the project is not available. */
+  config: ProjectConfig | null;
 }
 
 /** The status of one project. Opens it read-only. A lower schema version is "schema_mismatch" (design 8). */
-export function describeProject(root: string): { summary: ProjectSummary; config: ProjectConfig | null } {
+export function describeProject(root: string): ProjectSummary {
   const base = { pid: pidOf(root), root: resolve(root) };
   try {
     const p = openProject(root, { write: false });
@@ -49,23 +51,22 @@ export function describeProject(root: string): { summary: ProjectSummary; config
       project_id: p.config.project_id,
       schema_version: p.config.schema_version,
       status: "ok",
+      config: p.config,
     };
     if (p.config.schema_version !== SCHEMA_VERSION) {
       summary.status = "schema_mismatch";
       summary.message =
         `schema version ${p.config.schema_version} is older than this tracker (version ${SCHEMA_VERSION}). ` +
         `Run "tracker migrate" in the project.`;
+      summary.config = null;
     }
-    return { summary, config: p.config };
+    return summary;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     let status: ProjectStatus = "invalid";
     if (err instanceof TrackerError && err.code === EXIT_NOT_FOUND) status = "missing";
     if (err instanceof TrackerError && err.code === EXIT_SCHEMA_VERSION) status = "schema_mismatch";
-    return {
-      summary: { ...base, name: basename(base.root), project_id: null, schema_version: null, status, message },
-      config: null,
-    };
+    return { ...base, name: basename(base.root), project_id: null, schema_version: null, status, message, config: null };
   }
 }
 
