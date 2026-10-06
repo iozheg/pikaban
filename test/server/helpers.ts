@@ -2,7 +2,7 @@ import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest, type IncomingHttpHeaders } from "node:http";
 import { createServer } from "node:net";
 import { join } from "node:path";
-import { initProject } from "../../src/core/index.js";
+import { addProject, initProject, prepareInit } from "../../src/core/index.js";
 import { pidOf, startServer, type RunningServer, type ServerOptions, type TrackerEvent } from "../../src/server/index.js";
 import { removeDir, tempDir } from "../helpers.js";
 
@@ -26,7 +26,8 @@ export function makeEnv(): Env {
     project(name) {
       const root = join(base, name);
       mkdirSync(root);
-      initProject(root, { homeDir: home, name });
+      initProject(root, prepareInit(root, { name }));
+      addProject(root, home);
       return { root, pid: pidOf(root) };
     },
     cleanup: () => removeDir(base),

@@ -1,13 +1,12 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { isAbsolute, relative } from "node:path";
 import { Option, type Command } from "commander";
 import {
   addProject,
   EXIT_GENERAL,
-  EXIT_NOT_FOUND,
   EXIT_USAGE,
-  initialConfig,
   initProject,
+  prepareInit,
   projectPaths,
   readGlobalConfig,
   TRACKER_DIR,
@@ -110,17 +109,16 @@ export async function resolveInitAnswers(
   return { skill, allow };
 }
 
-/** Plan step 9, step 1: the checks before the questions. Writes nothing. */
-function preflight(root: string, opts: InitCommandOptions, homeDir: string): { config: ProjectConfig; listed: boolean } {
-  const paths = projectPaths(root);
-  if (!existsSync(paths.root) || !statSync(paths.root).isDirectory()) {
-    throw new TrackerError(EXIT_NOT_FOUND, `folder not found: ${paths.root}`);
-  }
-  if (existsSync(paths.trackerDir)) {
-    throw new TrackerError(EXIT_GENERAL, `${TRACKER_DIR}/ already exists in ${paths.root}. The project is already initialized.`);
-  }
-  const config = initialConfig(paths.root, { name: opts.name, id: opts.id }); // code 7
-  const listed = readGlobalConfig(homeDir).projects.includes(paths.root); // code 7
+interface Preflight {
+  config: ProjectConfig;
+  /** True if the project is already in the global config. */
+  listed: boolean;
+}
+
+/** The checks before the questions (codes 1, 3, 7). Writes nothing. */
+function preflight(root: string, opts: InitCommandOptions, homeDir: string): Preflight {
+  const config = prepareInit(root, { name: opts.name, id: opts.id });
+  const listed = readGlobalConfig(homeDir).projects.includes(projectPaths(root).root); // code 7
   return { config, listed };
 }
 
@@ -138,23 +136,23 @@ interface Step {
  */
 export async function runInit(ctx: Context, opts: InitCommandOptions, deps: InitDeps = {}): Promise<InitRunResult> {
   const interactive = deps.interactive ?? (!ctx.json && isInteractive());
-  if (!interactive || deps.ask !== undefined) return initSequence(ctx, opts, interactive, deps.ask);
-  // Check before the terminal opens, so that a quick error does not wait for input.
-  preflight(ctx.startDir, opts, ctx.homeDir);
-  return withTerminal((ask) => initSequence(ctx, opts, true, ask));
+  // 1. Checks, before the terminal opens, so that a quick error does not wait for input.
+  const pre = preflight(ctx.startDir, opts, ctx.homeDir);
+  if (!interactive || deps.ask !== undefined) return initSequence(ctx, opts, pre, interactive, deps.ask);
+  return withTerminal((ask) => initSequence(ctx, opts, pre, true, ask));
 }
 
 async function initSequence(
   ctx: Context,
   opts: InitCommandOptions,
+  { config, listed }: Preflight,
   interactive: boolean,
   ask: Ask | undefined,
 ): Promise<InitRunResult> {
   const paths = projectPaths(ctx.startDir);
   const root = paths.root;
 
-  // 1. Checks. 2-3. Answers.
-  const { config, listed } = preflight(root, opts, ctx.homeDir);
+  // 2-3. Answers.
   const answers = await resolveInitAnswers(opts, { interactive, ask });
 
   // Find what each step will do. A skill conflict or invalid settings JSON stops here (no writes).
@@ -205,7 +203,7 @@ async function initSequence(
       done: `made ${paths.trackerDir}`,
       fix: `the ${TRACKER_DIR}/ folder is not complete. Remove ${paths.trackerDir}, then run tracker init again`,
       run: () => {
-        initProject(root, { name: opts.name, id: opts.id, homeDir: ctx.homeDir, register: false });
+        initProject(root, config);
       },
     },
     {

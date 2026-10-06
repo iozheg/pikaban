@@ -3,11 +3,13 @@ import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  addProject,
   appendNote,
   check,
   create,
   initProject,
   openProject,
+  prepareInit,
   remove,
   removeProject,
   update,
@@ -169,7 +171,8 @@ describe("GET /api/events", () => {
     // Add a project.
     const betaRoot = join(env.base, "beta");
     mkdirSync(betaRoot);
-    initProject(betaRoot, { homeDir: env.home });
+    initProject(betaRoot, prepareInit(betaRoot));
+    addProject(betaRoot, env.home);
     await c.waitFor((e) => e.type === "projects");
     expect(c.events.find((e) => e.type === "projects")).toEqual({ type: "projects" });
     const listed = await request(server.port, "GET", "/api/projects");

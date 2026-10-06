@@ -81,30 +81,22 @@ export function create(p: Project, input: { title: string; body?: string; catego
   mkdirSync(p.tasksDir, { recursive: true });
   const now = new Date().toISOString();
   const short = nextShort(list(p).tasks);
-  const make = () => {
-    const frontmatter: TaskFrontmatter = {
-      id: newUlid(),
-      short,
-      title: input.title,
-      category: input.category ?? defaultCategory(p.config),
-      assignee: null,
-      needs_input: false,
-      created_at: now,
-      updated_at: now,
-    };
-    const file = join(p.tasksDir, fileName(short, frontmatter.id));
-    const body = normalizeBody(input.body ?? "");
-    const text = toText(p, frontmatter, body, file);
-    createExclusive(file, text);
-    return toTask(file, text, frontmatter, body);
+  const frontmatter: TaskFrontmatter = {
+    id: newUlid(),
+    short,
+    title: input.title,
+    category: input.category ?? defaultCategory(p.config),
+    assignee: null,
+    needs_input: false,
+    created_at: now,
+    updated_at: now,
   };
-  try {
-    return make();
-  } catch (err) {
-    // The file exists: try again one time with a new ULID.
-    if (err instanceof TrackerError && err.code === EXIT_CONFLICT) return make();
-    throw err;
-  }
+  // The file name contains the new ULID, so it cannot exist yet. `wx` still stops with code 5 if it does.
+  const file = join(p.tasksDir, fileName(short, frontmatter.id));
+  const body = normalizeBody(input.body ?? "");
+  const text = toText(p, frontmatter, body, file);
+  createExclusive(file, text);
+  return toTask(file, text, frontmatter, body);
 }
 
 /** Changes title, category, assignee, needs_input or body. Sets `updated_at`. */
@@ -113,29 +105,20 @@ export function update(p: Project, ref: string, patch: TaskPatch, opts: WriteOpt
   const fields = validate(TaskPatchSchema, patch, "task change");
   const task = get(p, ref);
   checkMatch(task, opts.ifMatch);
-
   const { body, ...changes } = fields;
-  const frontmatter: TaskFrontmatter = {
-    ...frontmatterOf(task),
-    ...Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== undefined)),
-    updated_at: new Date().toISOString(),
-  };
-  const newBody = body === undefined ? task.body : normalizeBody(body);
-  const text = toText(p, frontmatter, newBody, task.file);
-
-  assertUnchanged(task);
-  atomicWrite(task.file, text);
-  return toTask(task.file, text, frontmatter, newBody);
+  const defined = Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== undefined));
+  return rewrite(p, task, defined, body === undefined ? task.body : normalizeBody(body));
 }
 
 /** Adds `text` to the end of the body, after a blank line. */
 export function appendNote(p: Project, ref: string, text: string, opts: WriteOptions = {}): Task {
+  assertWritable(p);
   if (text.trim() === "") throw new TrackerError(EXIT_VALIDATION, "note text must not be empty");
   const task = get(p, ref);
   checkMatch(task, opts.ifMatch);
   const note = normalizeBody(text);
   const body = task.body.trim() === "" ? note : task.body.replace(/\n*$/, "\n\n") + note;
-  return update(p, task.id, { body }, { ifMatch: task.etag });
+  return rewrite(p, task, {}, body);
 }
 
 /** Gives the task a new short name and renames its file to match. For `check --fix`. */
@@ -150,12 +133,13 @@ export function changeShort(p: Project, task: Task, short: string): Task {
   return toTask(file, text, frontmatter, task.body);
 }
 
-/** Deletes the task file. */
-export function remove(p: Project, ref: string, opts: WriteOptions = {}): void {
+/** Deletes the task file. Returns the deleted task. */
+export function remove(p: Project, ref: string, opts: WriteOptions = {}): Task {
   assertWritable(p);
   const task = get(p, ref);
   checkMatch(task, opts.ifMatch);
   unlinkSync(task.file);
+  return task;
 }
 
 /** Absolute paths of the `*.md` files at depth 0 of a tasks folder, sorted by name. */
@@ -186,6 +170,15 @@ function toText(p: Project, frontmatter: TaskFrontmatter, body: string, file: st
 
 function toTask(file: string, text: string, frontmatter: TaskFrontmatter, body: string): Task {
   return { ...frontmatter, body, file, etag: contentHash(text) };
+}
+
+/** Writes a loaded task with changed fields and body. Sets `updated_at`. */
+function rewrite(p: Project, task: Task, changes: Partial<TaskFrontmatter>, body: string): Task {
+  const frontmatter: TaskFrontmatter = { ...frontmatterOf(task), ...changes, updated_at: new Date().toISOString() };
+  const text = toText(p, frontmatter, body, task.file);
+  assertUnchanged(task);
+  atomicWrite(task.file, text);
+  return toTask(task.file, text, frontmatter, body);
 }
 
 function frontmatterOf(t: Task): TaskFrontmatter {

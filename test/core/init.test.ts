@@ -1,9 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EXIT_GENERAL, EXIT_NOT_FOUND, EXIT_VALIDATION } from "../../src/core/errors.js";
-import { listProjects } from "../../src/core/globalConfig.js";
-import { initProject, projectIdFrom } from "../../src/core/init.js";
+import { initProject, prepareInit, projectIdFrom } from "../../src/core/init.js";
 import { openProject } from "../../src/core/project.js";
 import { create } from "../../src/core/tasks.js";
 import { removeDir, tempDir, trackerError } from "../helpers.js";
@@ -32,49 +31,41 @@ describe("projectIdFrom", () => {
   });
 });
 
-describe("initProject", () => {
-  it("makes a project that openProject and create accept, and registers it", () => {
-    const r = initProject(root, { homeDir: home });
-    expect(r.registered).toBe(true);
-    expect(r.config).toEqual({
+describe("prepareInit and initProject", () => {
+  it("makes a project that openProject and create accept, and does not register it", () => {
+    const config = prepareInit(root);
+    expect(config).toEqual({
       schema_version: 1,
       project_id: "my-project",
       project_name: "My Project",
       categories: ["backlog", "todo", "in_progress", "done"],
     });
-    expect(JSON.parse(readFileSync(r.configFile, "utf8"))).toEqual(r.config);
-    expect(listProjects(home)).toEqual([r.root]);
+    const paths = initProject(root, config);
+    expect(JSON.parse(readFileSync(paths.configFile, "utf8"))).toEqual(config);
+    expect(existsSync(join(home, ".tracker_config.json"))).toBe(false);
     const p = openProject(root, { write: true });
     expect(create(p, { title: "A" }).short).toBe("task-0001");
   });
 
-  it("uses name, id and categories; register: false does not change the global config", () => {
-    const r = initProject(root, { homeDir: home, name: "N", id: "i", categories: ["a", "in_progress", "done"], register: false });
-    expect(r.config).toMatchObject({ project_name: "N", project_id: "i", categories: ["a", "in_progress", "done"] });
-    expect(r.registered).toBe(false);
-    expect(existsSync(join(home, ".tracker_config.json"))).toBe(false);
+  it("uses name, id and categories", () => {
+    const config = prepareInit(root, { name: "N", id: "i", categories: ["a", "in_progress", "done"] });
+    expect(config).toMatchObject({ project_name: "N", project_id: "i", categories: ["a", "in_progress", "done"] });
   });
 
-  it("stops with code 1 if .tracker/ exists", () => {
+  it("stops with code 1 if .tracker/ exists, in the checks and in the write", () => {
+    const config = prepareInit(root);
     mkdirSync(join(root, ".tracker"));
-    trackerError(EXIT_GENERAL, () => initProject(root, { homeDir: home }));
+    trackerError(EXIT_GENERAL, () => prepareInit(root));
+    trackerError(EXIT_GENERAL, () => initProject(root, config));
     expect(existsSync(join(root, ".tracker", "config.json"))).toBe(false);
   });
 
   it("stops with code 3 if the folder does not exist", () => {
-    trackerError(EXIT_NOT_FOUND, () => initProject(join(base, "missing"), { homeDir: home }));
+    trackerError(EXIT_NOT_FOUND, () => prepareInit(join(base, "missing")));
   });
 
-  it("stops with code 7 before a write for invalid categories or an invalid global config", () => {
-    trackerError(EXIT_VALIDATION, () => initProject(root, { homeDir: home, categories: ["todo"] }));
-    writeFileSync(join(home, ".tracker_config.json"), "{");
-    trackerError(EXIT_VALIDATION, () => initProject(root, { homeDir: home }));
+  it("stops with code 7 for invalid categories", () => {
+    trackerError(EXIT_VALIDATION, () => prepareInit(root, { categories: ["todo"] }));
     expect(existsSync(join(root, ".tracker"))).toBe(false);
-  });
-
-  it("keeps .tracker/ if the global config write fails, and tells how to add the project", () => {
-    const err = trackerError(EXIT_GENERAL, () => initProject(root, { homeDir: join(base, "no-such-home") }));
-    expect(err.message).toContain("tracker projects add");
-    expect(existsSync(join(root, ".tracker", "config.json"))).toBe(true);
   });
 });
