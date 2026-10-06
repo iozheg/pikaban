@@ -1,0 +1,348 @@
+import { render } from "preact";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { api, connectEvents } from "./api.js";
+import { AddTask } from "./components/AddTask.js";
+import { Board } from "./components/Board.js";
+import { ProjectSelector } from "./components/ProjectSelector.js";
+import { TaskEditor } from "./components/TaskEditor.js";
+import {
+  ApiError,
+  applyCurrent,
+  CONFLICT_MESSAGE,
+  errorMessage,
+  isAvailable,
+  isConflict,
+  moveTaskLocal,
+  pickProject,
+  planEvent,
+  removeInvalid,
+  removeTask,
+  revertMove,
+  sortTasks,
+  upsertTask,
+} from "./logic.js";
+import { loadSelectedProject, saveSelectedProject } from "./storage.js";
+import type { InvalidFile, ProjectDetail, ProjectSummary, Task, TrackerEvent } from "./types.js";
+import "./styles.css";
+
+interface Toast {
+  id: number;
+  text: string;
+}
+
+type Live = "connecting" | "live" | "down";
+
+function App() {
+  const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [pid, setPid] = useState<string | null>(null);
+  const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [invalid, setInvalid] = useState<InvalidFile[]>([]);
+  const [tasksError, setTasksError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [openInitial, setOpenInitial] = useState<Task | null>(null);
+  const [live, setLive] = useState<Live>("connecting");
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // The SSE handlers and async loads read these refs, not stale state.
+  const pidRef = useRef<string | null>(null);
+  const dirtyRef = useRef(false);
+  const preferredRef = useRef<string | null>(loadSelectedProject());
+  const toastSeq = useRef(0);
+
+  const notify = (text: string) => {
+    const id = ++toastSeq.current;
+    setToasts((t) => [...t.slice(-3), { id, text }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
+  };
+
+  const confirmDiscard = () => !dirtyRef.current || confirm("Discard your unsaved changes?");
+
+  // --- Loads -----------------------------------------------------------------------------------
+
+  async function loadProject(p: string) {
+    try {
+      const detail = await api.project(p);
+      if (pidRef.current === p) setProject(detail);
+    } catch (err) {
+      if (pidRef.current !== p) return;
+      setProject(null);
+      setTasksError(errorMessage(err));
+    }
+  }
+
+  async function loadTasks(p: string) {
+    try {
+      const list = await api.tasks(p);
+      if (pidRef.current !== p) return;
+      setTasks(sortTasks(list.tasks));
+      setInvalid(list.invalid);
+      setTasksError(null);
+    } catch (err) {
+      if (pidRef.current === p) setTasksError(errorMessage(err));
+    }
+  }
+
+  async function loadTask(p: string, id: string) {
+    try {
+      const t = await api.task(p, id);
+      if (pidRef.current !== p) return;
+      setTasks((ts) => upsertTask(ts, t));
+      setInvalid((inv) => removeInvalid(inv, t.file));
+    } catch (err) {
+      if (pidRef.current !== p) return;
+      // 404: the file is gone, or it is not valid now (then the list shows an error card).
+      if (err instanceof ApiError && err.status === 404) setTasks((ts) => removeTask(ts, id));
+      void loadTasks(p);
+    }
+  }
+
+  /** Selects a project. `force`: no question about unsaved edits (the project is gone). */
+  function selectProject(next: string | null, force = false): boolean {
+    if (next === pidRef.current) return true;
+    if (!force && !confirmDiscard()) return false;
+    pidRef.current = next;
+    setPid(next);
+    if (next !== null) {
+      preferredRef.current = next;
+      saveSelectedProject(next);
+    }
+    setOpenId(null);
+    setProject(null);
+    setTasks([]);
+    setInvalid([]);
+    setTasksError(null);
+    if (next !== null) {
+      void loadProject(next);
+      void loadTasks(next);
+    }
+    return true;
+  }
+
+  async function loadProjects() {
+    try {
+      const list = await api.projects();
+      setProjects(list);
+      setProjectsError(null);
+      const current = pidRef.current;
+      // Keep the selected project while it is in the list, also when it is not available now:
+      // the page then shows why.
+      if (current === null || !list.some((p) => p.pid === current)) {
+        selectProject(pickProject(list, current ?? preferredRef.current), true);
+      }
+    } catch (err) {
+      setProjectsError(errorMessage(err));
+    }
+  }
+
+  function reloadAll() {
+    void loadProjects();
+    const p = pidRef.current;
+    if (p !== null) {
+      void loadProject(p);
+      void loadTasks(p);
+    }
+  }
+
+  function onEvent(e: TrackerEvent) {
+    const p = pidRef.current;
+    const plan = planEvent(e, p);
+    if (plan.kind === "none" || (plan.kind !== "projects" && p === null)) return;
+    switch (plan.kind) {
+      case "projects":
+        void loadProjects();
+        break;
+      case "project":
+        void loadProjects();
+        void loadProject(p!);
+        void loadTasks(p!);
+        break;
+      case "task":
+        void loadTask(p!, plan.id);
+        break;
+      case "removed":
+        setTasks((ts) => removeTask(ts, plan.id));
+        setInvalid((inv) => removeInvalid(inv, plan.file));
+        break;
+      case "tasks":
+        void loadTasks(p!);
+        break;
+    }
+  }
+
+  // --- Live updates ------------------------------------------------------------------------------
+
+  const handlers = useRef({ reloadAll, onEvent });
+  handlers.current = { reloadAll, onEvent };
+
+  useEffect(() => {
+    void loadProjects();
+    const close = connectEvents({
+      // After each (re)connection, load everything: the watcher can miss very early changes.
+      onOpen: () => {
+        setLive("live");
+        handlers.current.reloadAll();
+      },
+      onDown: () => setLive("down"),
+      onEvent: (e) => handlers.current.onEvent(e),
+    });
+    const beforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current) e.preventDefault();
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => {
+      close();
+      window.removeEventListener("beforeunload", beforeUnload);
+    };
+  }, []);
+
+  // --- Board actions -----------------------------------------------------------------------------
+
+  async function moveTask(id: string, category: string) {
+    const p = pidRef.current;
+    const prev = tasks.find((t) => t.id === id);
+    if (p === null || !prev || prev.category === category) return;
+    setTasks((ts) => moveTaskLocal(ts, id, category));
+    try {
+      const saved = await api.patchTask(p, id, { category }, prev.etag);
+      if (pidRef.current === p) setTasks((ts) => upsertTask(ts, saved));
+    } catch (err) {
+      if (pidRef.current !== p) return;
+      if (isConflict(err)) {
+        setTasks((ts) => applyCurrent(ts, id, err.current ?? null));
+        notify(CONFLICT_MESSAGE);
+      } else {
+        setTasks((ts) => revertMove(ts, prev));
+        notify(`Cannot move ${prev.short}: ${errorMessage(err)}`);
+      }
+    }
+  }
+
+  function openTask(id: string) {
+    if (id === openId) return;
+    const t = tasks.find((x) => x.id === id);
+    if (!t || !confirmDiscard()) return;
+    dirtyRef.current = false;
+    setOpenInitial(t);
+    setOpenId(id);
+  }
+
+  function closeEditor() {
+    dirtyRef.current = false;
+    setOpenId(null);
+  }
+
+  // --- Render ----------------------------------------------------------------------------------
+
+  const summary = projects?.find((p) => p.pid === pid) ?? null;
+  const config = project?.status === "ok" ? project.config : null;
+  const openTaskNow = openId === null ? null : (tasks.find((t) => t.id === openId) ?? null);
+
+  useEffect(() => {
+    document.title = summary ? `${summary.name} · Tracker` : "Tracker";
+  }, [summary?.name]);
+
+  return (
+    <div class={`app${openId !== null ? " editor-open" : ""}`}>
+      <header class="topbar">
+        <h1 class="brand">Tracker</h1>
+        {projects && <ProjectSelector projects={projects} selected={pid} onSelect={(p) => selectProject(p)} />}
+        {summary && <span class="project-root" title={summary.root}>{summary.root}</span>}
+        <span class={`live live-${live}`} title="Live updates from the files on disk">
+          {live === "live" ? "Live" : live === "down" ? "Reconnecting…" : "Connecting…"}
+        </span>
+      </header>
+
+      <main class="content">
+        {projectsError && (
+          <div class="notice notice-error" role="alert">
+            <p>Cannot load the projects: {projectsError}</p>
+            <button type="button" onClick={() => void loadProjects()}>
+              Try again
+            </button>
+          </div>
+        )}
+
+        {projects && projects.length === 0 && (
+          <div class="empty">
+            <h2>No projects</h2>
+            <p>
+              Run <code>tracker init</code> in a project folder, or <code>tracker projects add &lt;path&gt;</code>.
+              The board shows the project at once.
+            </p>
+          </div>
+        )}
+
+        {projects && projects.length > 0 && pid === null && (
+          <div class="empty">
+            <h2>No available project</h2>
+            <p>All projects in the list are unavailable. Open “unavailable projects” above to see why.</p>
+          </div>
+        )}
+
+        {summary && !isAvailable(summary) && (
+          <div class="notice notice-error" role="alert">
+            <p>
+              <strong>{summary.name}</strong> is not available: {summary.message ?? summary.status}
+            </p>
+          </div>
+        )}
+
+        {tasksError && summary && isAvailable(summary) && (
+          <div class="notice notice-error" role="alert">
+            <p>Cannot load the tasks: {tasksError}</p>
+          </div>
+        )}
+
+        {pid !== null && config && summary && isAvailable(summary) && (
+          <>
+            <AddTask
+              pid={pid}
+              firstCategory={config.categories[0] ?? ""}
+              onCreated={(t) => {
+                setTasks((ts) => upsertTask(ts, t));
+                notify(`Added ${t.short}.`);
+              }}
+            />
+            <Board
+              categories={config.categories}
+              tasks={tasks}
+              invalid={invalid}
+              selectedId={openId}
+              onOpen={openTask}
+              onMove={(id, c) => void moveTask(id, c)}
+            />
+          </>
+        )}
+      </main>
+
+      {pid !== null && config && openId !== null && openInitial !== null && (
+        <TaskEditor
+          key={openId}
+          pid={pid}
+          task={openTaskNow}
+          initial={openInitial}
+          categories={config.categories}
+          onClose={closeEditor}
+          onTask={(t) => setTasks((ts) => upsertTask(ts, t))}
+          onGone={(id) => setTasks((ts) => removeTask(ts, id))}
+          onDirtyChange={(d) => {
+            dirtyRef.current = d;
+          }}
+          notify={notify}
+        />
+      )}
+
+      <div class="toasts" role="status" aria-live="polite">
+        {toasts.map((t) => (
+          <div key={t.id} class="toast">
+            {t.text}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+render(<App />, document.getElementById("app")!);

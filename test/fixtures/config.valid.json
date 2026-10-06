@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "project_id": "my-project",
+  "project_name": "My Project",
+  "categories": ["backlog", "todo", "in_progress", "done"]
+}

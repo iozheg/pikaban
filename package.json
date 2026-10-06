@@ -1,0 +1,51 @@
+{
+  "name": "tasktracker",
+  "version": "0.1.0",
+  "description": "Local task tracker for one user and one AI coding agent",
+  "keywords": [
+    "task-tracker",
+    "kanban",
+    "cli",
+    "claude-code",
+    "ai-agent",
+    "markdown",
+    "tasks"
+  ],
+  "type": "module",
+  "bin": {
+    "tracker": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup && vite build",
+    "prepare": "npm run build",
+    "dev": "vite",
+    "dev:cli": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.ui.json"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "commander": "^14.0.3",
+    "open": "^11.0.4",
+    "ulidx": "^2.4.1",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^22.20.5",
+    "dompurify": "^3.4.16",
+    "marked": "^18.1.0",
+    "preact": "^10.29.8",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
+  }
+}
