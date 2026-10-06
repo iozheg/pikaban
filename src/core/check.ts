@@ -29,8 +29,11 @@ export interface CheckReport {
 export interface CheckOptions {
   /** Give a new short name to the newer task of each duplicate pair, and rename its file. */
   fix?: boolean;
-  /** More checks, for example the skill version (plan step 8). */
-  extraChecks?: readonly ((p: Project) => CheckIssue[])[];
+}
+
+/** True if no error remains. Warnings do not count. */
+export function isOk(issues: readonly CheckIssue[]): boolean {
+  return !issues.some((i) => i.severity === "error" && !i.fixed);
 }
 
 /**
@@ -89,7 +92,5 @@ export function check(p: Project, opts: CheckOptions = {}): CheckReport {
     }
   }
 
-  for (const extra of opts.extraChecks ?? []) issues.push(...extra(p));
-
-  return { ok: !issues.some((i) => i.severity === "error" && !i.fixed), issues };
+  return { ok: isOk(issues), issues };
 }

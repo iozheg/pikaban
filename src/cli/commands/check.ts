@@ -1,17 +1,8 @@
 import { isAbsolute, relative } from "node:path";
 import type { Command } from "commander";
-import { check, EXIT_VALIDATION, type CheckIssue, type CheckReport, type Project } from "../../core/index.js";
+import { check, EXIT_VALIDATION, isOk, type CheckReport, type Project } from "../../core/index.js";
 import { checkSkillVersions } from "../../skill/install.js";
-import { contextOf, type Context } from "../context.js";
-
-export type ExtraCheck = (p: Project, ctx: Context) => CheckIssue[];
-
-/** Skill version (plan step 8): the project skill and the user skill, if installed. */
-export const skillVersionCheck: ExtraCheck = (p, ctx) =>
-  checkSkillVersions({ projectRoot: p.root, homeDir: ctx.homeDir });
-
-/** Checks that `tracker check` runs after the core checks. */
-export const EXTRA_CHECKS: ExtraCheck[] = [skillVersionCheck];
+import { contextOf } from "../context.js";
 
 /** The path relative to the project, or the absolute path for a file outside the project. */
 function displayPath(root: string, file: string): string {
@@ -33,7 +24,7 @@ function formatReport(p: Project, report: CheckReport): string {
   return lines.join("\n");
 }
 
-export function register(program: Command, deps: { extraChecks?: readonly ExtraCheck[] } = {}): void {
+export function register(program: Command): void {
   program
     .command("check")
     .description("validate the config, all task files and the skill version (exit code 7 on errors)")
@@ -41,8 +32,12 @@ export function register(program: Command, deps: { extraChecks?: readonly ExtraC
     .action((opts: { fix?: boolean }, cmd: Command) => {
       const ctx = contextOf(cmd);
       const p = ctx.project({ write: opts.fix ?? false });
-      const extraChecks = (deps.extraChecks ?? EXTRA_CHECKS).map((c) => (proj: Project) => c(proj, ctx));
-      const report = check(p, { fix: opts.fix ?? false, extraChecks });
+      // The core checks, then the skill version (plan step 8): the project skill and the user skill, if installed.
+      const issues = [
+        ...check(p, { fix: opts.fix ?? false }).issues,
+        ...checkSkillVersions({ projectRoot: p.root, homeDir: ctx.homeDir }),
+      ];
+      const report: CheckReport = { ok: isOk(issues), issues };
       ctx.out.result(report, () => formatReport(p, report));
       if (!report.ok) process.exitCode = EXIT_VALIDATION;
     });

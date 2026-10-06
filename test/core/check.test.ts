@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { check } from "../../src/core/check.js";
+import { check, isOk, type CheckIssue } from "../../src/core/check.js";
 import { openProject } from "../../src/core/project.js";
 import { get } from "../../src/core/tasks.js";
 import { CONFIG, copyValidFixtures, makeProject, removeDir, taskText, tempDir } from "../helpers.js";
@@ -103,13 +103,21 @@ describe("check", () => {
     expect(report.issues).toEqual([expect.objectContaining({ kind: "schema_version" })]);
   });
 
-  it("adds the issues of extra checks (hook for the skill version)", () => {
-    const report = check(openProject(root), {
-      extraChecks: [
-        (p) => [{ kind: "skill_version", severity: "warning", file: p.root, message: "skill is older" }],
-      ],
-    });
-    expect(report.ok).toBe(true);
-    expect(report.issues).toEqual([expect.objectContaining({ kind: "skill_version" })]);
+});
+
+describe("isOk", () => {
+  const issue = (severity: "error" | "warning", fixed?: boolean): CheckIssue => ({
+    kind: "skill_version",
+    severity,
+    file: "f",
+    message: "m",
+    ...(fixed ? { fixed } : {}),
+  });
+
+  it("warnings and fixed errors do not count, other errors do", () => {
+    expect(isOk([])).toBe(true);
+    expect(isOk([issue("warning")])).toBe(true);
+    expect(isOk([issue("error", true), issue("warning")])).toBe(true);
+    expect(isOk([issue("warning"), issue("error")])).toBe(false);
   });
 });
