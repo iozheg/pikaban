@@ -7,7 +7,7 @@ import { addGitExcludes, excludePattern, findGitRepo } from "../../src/core/git.
 import { DEFAULT_CATEGORIES } from "../../src/core/init.js";
 import { openProject } from "../../src/core/project.js";
 import { create, update } from "../../src/core/tasks.js";
-import { CONFIG, makeProject, removeDir, tempDir, trackerError } from "../helpers.js";
+import { CONFIG, makeProject, removeDir, tempDir, pikabanError } from "../helpers.js";
 
 let root: string;
 beforeEach(() => {
@@ -15,7 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => removeDir(root));
 
-const categoriesOnDisk = () => JSON.parse(readFileSync(join(root, ".tracker", "config.json"), "utf8")).categories;
+const categoriesOnDisk = () => JSON.parse(readFileSync(join(root, ".pikaban", "config.json"), "utf8")).categories;
 
 describe("categoriesWith", () => {
   it("gives the required categories and the selected optional ones in board order", () => {
@@ -26,8 +26,8 @@ describe("categoriesWith", () => {
 
   it("accepts only backlog and review", () => {
     expect(parseOptionalCategory("review")).toBe("review");
-    trackerError(EXIT_USAGE, () => parseOptionalCategory("done"));
-    trackerError(EXIT_USAGE, () => parseOptionalCategory("qa"));
+    pikabanError(EXIT_USAGE, () => parseOptionalCategory("done"));
+    pikabanError(EXIT_USAGE, () => parseOptionalCategory("qa"));
   });
 });
 
@@ -54,7 +54,7 @@ describe("setCategoryEnabled", () => {
     let p = openProject(root, { write: true });
     const t = create(p, { title: "t" });
     update(p, t.short, { category: "review" });
-    const err = trackerError(EXIT_GENERAL, () => setCategoryEnabled(p, "review", false));
+    const err = pikabanError(EXIT_GENERAL, () => setCategoryEnabled(p, "review", false));
     expect(err.message).toContain(t.short);
     expect(categoriesOnDisk()).toContain("review");
 
@@ -72,11 +72,11 @@ describe("git exclude", () => {
     mkdirSync(sub, { recursive: true });
     const repo = findGitRepo(sub)!;
     expect(repo).toEqual({ root, excludeFile: join(root, ".git", "info", "exclude") });
-    const pattern = excludePattern(repo, join(sub, ".tracker"));
-    expect(pattern).toBe("/a/b/.tracker/");
+    const pattern = excludePattern(repo, join(sub, ".pikaban"));
+    expect(pattern).toBe("/a/b/.pikaban/");
     expect(addGitExcludes(repo, [pattern])).toEqual([pattern]);
     expect(addGitExcludes(repo, [pattern])).toEqual([]);
-    expect(readFileSync(repo.excludeFile, "utf8")).toBe("# comment\n/a/b/.tracker/\n");
+    expect(readFileSync(repo.excludeFile, "utf8")).toBe("# comment\n/a/b/.pikaban/\n");
   });
 
   it("uses the common git folder of a linked worktree", () => {
@@ -87,7 +87,7 @@ describe("git exclude", () => {
     mkdirSync(wt);
     writeFileSync(join(wt, ".git"), `gitdir: ${join(main, "worktrees", "wt")}\n`);
     expect(findGitRepo(wt)).toEqual({ root: wt, excludeFile: join(main, "info", "exclude") });
-    expect(addGitExcludes(findGitRepo(wt)!, ["/.tracker/"])).toEqual(["/.tracker/"]);
+    expect(addGitExcludes(findGitRepo(wt)!, ["/.pikaban/"])).toEqual(["/.pikaban/"]);
   });
 
   it("gives null outside a repository", () => {

@@ -16,12 +16,12 @@ export type ExitCode =
   | typeof EXIT_SCHEMA_VERSION
   | typeof EXIT_VALIDATION;
 
-export class TrackerError extends Error {
+export class PikabanError extends Error {
   readonly code: ExitCode;
 
   constructor(code: ExitCode, message: string, options?: { cause?: unknown }) {
     super(message, options);
-    this.name = "TrackerError";
+    this.name = "PikabanError";
     this.code = code;
   }
 }

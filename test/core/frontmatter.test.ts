@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { EXIT_VALIDATION, TrackerError } from "../../src/core/errors.js";
+import { EXIT_VALIDATION, PikabanError } from "../../src/core/errors.js";
 import { parseTaskFile, serializeTaskFile, splitFrontmatter } from "../../src/core/frontmatter.js";
 import { ProjectConfigSchema } from "../../src/core/schema.js";
 
@@ -13,13 +13,13 @@ const config = ProjectConfigSchema.parse(
 );
 const opts = { categories: config.categories };
 
-function validationError(fn: () => unknown): TrackerError {
+function validationError(fn: () => unknown): PikabanError {
   try {
     fn();
   } catch (err) {
-    expect(err).toBeInstanceOf(TrackerError);
-    expect((err as TrackerError).code).toBe(EXIT_VALIDATION);
-    return err as TrackerError;
+    expect(err).toBeInstanceOf(PikabanError);
+    expect((err as PikabanError).code).toBe(EXIT_VALIDATION);
+    return err as PikabanError;
   }
   throw new Error("expected a validation error");
 }

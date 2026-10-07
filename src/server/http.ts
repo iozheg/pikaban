@@ -7,10 +7,10 @@ import {
   EXIT_SCHEMA_VERSION,
   EXIT_USAGE,
   EXIT_VALIDATION,
-  TrackerError,
+  PikabanError,
 } from "../core/index.js";
 
-/** An error with an HTTP status. `code` is the tracker exit code in the error body. */
+/** An error with an HTTP status. `code` is the pikaban exit code in the error body. */
 export class HttpError extends Error {
   constructor(
     readonly status: number,
@@ -23,7 +23,7 @@ export class HttpError extends Error {
   }
 }
 
-// Tracker exit code to HTTP status (plan step 10).
+// Pikaban exit code to HTTP status (plan step 10).
 const STATUS_OF_CODE: Record<number, number> = {
   [EXIT_USAGE]: 400,
   [EXIT_NOT_FOUND]: 404,
@@ -72,7 +72,7 @@ export function sendError(res: ServerResponse, err: unknown, extra: Record<strin
   let headers: Record<string, string> = {};
   if (err instanceof HttpError) {
     ({ status, code, message, headers } = err);
-  } else if (err instanceof TrackerError) {
+  } else if (err instanceof PikabanError) {
     status = statusOfCode(err.code);
     code = err.code;
     message = err.message;

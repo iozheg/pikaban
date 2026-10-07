@@ -88,7 +88,7 @@ describe("GET /api/events", () => {
     const r = spawnSync(process.execPath, [CLI, "add", "From the CLI", "--json"], {
       cwd: alpha.root,
       encoding: "utf8",
-      env: { ...process.env, TRACKER_HOME: env.home },
+      env: { ...process.env, PIKABAN_HOME: env.home },
     });
     expect(r.status, r.stderr).toBe(0);
     const id = JSON.parse(r.stdout).id as string;
@@ -137,9 +137,9 @@ describe("GET /api/events", () => {
 
   it("temporary files and other files do not give events", async () => {
     const c = await connect();
-    const dir = join(alpha.root, ".tracker", "tasks");
+    const dir = join(alpha.root, ".pikaban", "tasks");
     writeFileSync(join(dir, "task-0001-01JA2B3C4D5E6F7G8H9J0KMNPQ.md.abc123.tmp"), "x");
-    writeFileSync(join(alpha.root, ".tracker", "other.txt"), "x");
+    writeFileSync(join(alpha.root, ".pikaban", "other.txt"), "x");
     writeFileSync(join(alpha.root, "outside.md"), "x");
     // A marker event: the events before it are already received.
     const t = create(openProject(alpha.root), { title: "marker" });
@@ -150,14 +150,14 @@ describe("GET /api/events", () => {
 
   it("a task file with another name gives an event without `id`", async () => {
     const c = await connect();
-    const file = join(alpha.root, ".tracker", "tasks", "notes.md");
+    const file = join(alpha.root, ".pikaban", "tasks", "notes.md");
     writeFileSync(file, "x");
     expect(await c.waitFor((e) => e.file === "notes.md")).toEqual({ pid: alpha.pid, type: "changed", file: "notes.md" });
     rmSync(file);
     expect(await c.waitFor((e) => e.type === "removed")).toEqual({ pid: alpha.pid, type: "removed", file: "notes.md" });
   });
 
-  it("a change of .tracker/config.json gives a `config` event", async () => {
+  it("a change of .pikaban/config.json gives a `config` event", async () => {
     const c = await connect();
     const p = openProject(alpha.root);
     const file = p.configFile;
@@ -197,13 +197,13 @@ describe("GET /api/events", () => {
 
   it("a global config that is not valid JSON still gives a `projects` event", async () => {
     const c = await connect();
-    writeFileSync(join(env.home, ".tracker_config.json"), "{");
+    writeFileSync(join(env.home, ".pikaban_config.json"), "{");
     await c.waitFor((e) => e.type === "projects");
     const r = await request(server.port, "GET", "/api/projects");
     expect(r.status).toBe(422);
     expect(r.json.error.code).toBe(7);
     // The watchers stay. A correct file again gives the projects.
-    writeFileSync(join(env.home, ".tracker_config.json"), `${JSON.stringify({ projects: [alpha.root] })}\n`);
+    writeFileSync(join(env.home, ".pikaban_config.json"), `${JSON.stringify({ projects: [alpha.root] })}\n`);
     await c.waitFor((e) => e.type === "projects" && c.events.filter((x) => x.type === "projects").length >= 2);
     expect((await request(server.port, "GET", "/api/projects")).status).toBe(200);
   });

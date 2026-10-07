@@ -22,7 +22,7 @@ import {
   upsertTask,
 } from "./logic.js";
 import { loadSelectedProject, saveSelectedProject } from "./storage.js";
-import type { InvalidFile, ProjectSummary, Task, TrackerEvent } from "./types.js";
+import type { InvalidFile, ProjectSummary, Task, PikabanEvent } from "./types.js";
 import "./styles.css";
 
 interface Toast {
@@ -133,7 +133,7 @@ function App() {
     if (p !== null) void loadTasks(p);
   }
 
-  function onEvent(e: TrackerEvent) {
+  function onEvent(e: PikabanEvent) {
     const p = pidRef.current;
     const plan = planEvent(e, p);
     if (plan.kind === "none" || (plan.kind !== "projects" && p === null)) return;
@@ -227,13 +227,13 @@ function App() {
   const openTaskNow = openId === null ? null : (tasks.find((t) => t.id === openId) ?? null);
 
   useEffect(() => {
-    document.title = summary ? `${summary.name} · Tracker` : "Tracker";
+    document.title = summary ? `${summary.name} · Pikaban` : "Pikaban";
   }, [summary?.name]);
 
   return (
     <div class={`app${openId !== null ? " editor-open" : ""}`}>
       <header class="topbar">
-        <h1 class="brand">Tracker</h1>
+        <h1 class="brand">Pikaban</h1>
         {projects && <ProjectSelector projects={projects} selected={pid} onSelect={chooseProject} />}
         {summary && <span class="project-root" title={summary.root}>{summary.root}</span>}
         <span class={`live live-${live}`} title="Live updates from the files on disk">
@@ -255,7 +255,7 @@ function App() {
           <div class="empty">
             <h2>No projects</h2>
             <p>
-              Run <code>tracker init</code> in a project folder, or <code>tracker projects add &lt;path&gt;</code>.
+              Run <code>pikaban init</code> in a project folder, or <code>pikaban projects add &lt;path&gt;</code>.
               The board shows the project at once.
             </p>
           </div>

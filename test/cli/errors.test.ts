@@ -9,8 +9,8 @@ beforeEach(() => {
 });
 afterEach(() => sb.cleanup());
 
-const tasksDir = () => join(sb.dir, ".tracker", "tasks");
-const configFile = () => join(sb.dir, ".tracker", "config.json");
+const tasksDir = () => join(sb.dir, ".pikaban", "tasks");
+const configFile = () => join(sb.dir, ".pikaban", "config.json");
 
 function init(): void {
   expect(sb.run(["init", "--yes"]).code).toBe(0);
@@ -40,7 +40,7 @@ function setSchemaVersion(v: number): void {
 }
 
 describe("exit code 1: general error", () => {
-  it("init stops if .tracker/ already exists", () => {
+  it("init stops if .pikaban/ already exists", () => {
     init();
     const before = readFileSync(configFile(), "utf8");
     expect(expectCode(["init", "--name", "Other"], 1)).toContain("already exists");
@@ -105,7 +105,7 @@ describe("exit code 2: incorrect usage", () => {
 
 describe("exit code 3: not found", () => {
   it("no project", () => {
-    expect(expectCode(["list"], 3)).toContain("tracker init");
+    expect(expectCode(["list"], 3)).toContain("pikaban init");
     expectCode(["add", "A"], 3);
     expectCode(["check"], 3);
     expectCode(["migrate"], 3);
@@ -125,7 +125,7 @@ describe("exit code 3: not found", () => {
     expect(expectCode(["list", "-C", join(sb.dir, "missing")], 3)).toContain("folder not found");
   });
 
-  it("projects add without .tracker/, projects remove of a path not in the list", () => {
+  it("projects add without .pikaban/, projects remove of a path not in the list", () => {
     expectCode(["projects", "add", sb.dir], 3);
     expectCode(["projects", "remove", sb.dir], 3);
   });
@@ -159,7 +159,7 @@ describe("exit code 4: short name has more than one task", () => {
 
 // Exit code 5 (conflict) is not reachable from the CLI without a race: it needs a file change
 // between two reads in one command (milliseconds). The core tests cover it. The CLI maps
-// TrackerError code 5 to exit code 5 the same way as all other codes.
+// PikabanError code 5 to exit code 5 the same way as all other codes.
 
 describe("exit code 6: schema version", () => {
   it("a higher version stops all commands", () => {
@@ -167,7 +167,7 @@ describe("exit code 6: schema version", () => {
     sb.run(["add", "A"]);
     setSchemaVersion(2);
     for (const args of [["list"], ["show", "1"], ["add", "B"], ["move", "1", "done"], ["check"], ["migrate"]]) {
-      expect(expectCode(args, 6)).toContain("Update the tracker CLI");
+      expect(expectCode(args, 6)).toContain("Update the pikaban CLI");
     }
   });
 
@@ -185,7 +185,7 @@ describe("exit code 6: schema version", () => {
       ["delete", "1"],
       ["check", "--fix"],
     ]) {
-      expect(expectCode(args, 6)).toContain("tracker migrate");
+      expect(expectCode(args, 6)).toContain("pikaban migrate");
     }
     // check without --fix reads: it reports the version as an error (code 7).
     expect(sb.run(["check"]).code).toBe(7);
@@ -226,10 +226,10 @@ describe("exit code 7: validation error", () => {
 
   it("an invalid global config", () => {
     mkdirSync(join(sb.dir, "a"));
-    writeFileSync(join(sb.home, ".tracker_config.json"), "[");
+    writeFileSync(join(sb.home, ".pikaban_config.json"), "[");
     expectCode(["projects", "list"], 7);
     // init reads the global config before it writes: nothing is made.
     expectCode(["init", "-C", join(sb.dir, "a")], 7);
-    expect(existsSync(join(sb.dir, "a", ".tracker"))).toBe(false);
+    expect(existsSync(join(sb.dir, "a", ".pikaban"))).toBe(false);
   });
 });

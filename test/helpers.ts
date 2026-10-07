@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect } from "vitest";
-import { TrackerError, type ExitCode } from "../src/core/errors.js";
+import { PikabanError, type ExitCode } from "../src/core/errors.js";
 
 export const fixtures = join(import.meta.dirname, "fixtures");
 
@@ -14,28 +14,28 @@ export const CONFIG = {
 };
 
 export function tempDir(prefix: string): string {
-  return mkdtempSync(join(tmpdir(), `tracker-${prefix}-`));
+  return mkdtempSync(join(tmpdir(), `pikaban-${prefix}-`));
 }
 
 export function removeDir(dir: string): void {
   rmSync(dir, { recursive: true, force: true });
 }
 
-/** Makes `<root>/.tracker/config.json` and `.tracker/tasks/`. */
+/** Makes `<root>/.pikaban/config.json` and `.pikaban/tasks/`. */
 export function makeProject(root: string, config: Record<string, unknown> = CONFIG): void {
-  mkdirSync(join(root, ".tracker", "tasks"), { recursive: true });
+  mkdirSync(join(root, ".pikaban", "tasks"), { recursive: true });
   writeConfig(root, config);
 }
 
 export function writeConfig(root: string, config: Record<string, unknown>): void {
-  writeFileSync(join(root, ".tracker", "config.json"), `${JSON.stringify(config, null, 2)}\n`);
+  writeFileSync(join(root, ".pikaban", "config.json"), `${JSON.stringify(config, null, 2)}\n`);
 }
 
 /** Copies the valid fixture tasks (task-0042 to task-0045) into the project. */
 export function copyValidFixtures(root: string): void {
   const src = join(fixtures, "tasks", "valid");
   for (const name of readdirSync(src)) {
-    writeFileSync(join(root, ".tracker", "tasks", name), readFileSync(join(src, name)));
+    writeFileSync(join(root, ".pikaban", "tasks", name), readFileSync(join(src, name)));
   }
 }
 
@@ -56,14 +56,14 @@ export function taskText(fields: { id: string; short: string; title?: string; ca
   ].join("\n") + body;
 }
 
-/** Runs `fn` and returns the TrackerError. Fails if `fn` does not throw one with `code`. */
-export function trackerError(code: ExitCode, fn: () => unknown): TrackerError {
+/** Runs `fn` and returns the PikabanError. Fails if `fn` does not throw one with `code`. */
+export function pikabanError(code: ExitCode, fn: () => unknown): PikabanError {
   try {
     fn();
   } catch (err) {
-    expect(err).toBeInstanceOf(TrackerError);
-    expect((err as TrackerError).code).toBe(code);
-    return err as TrackerError;
+    expect(err).toBeInstanceOf(PikabanError);
+    expect((err as PikabanError).code).toBe(code);
+    return err as PikabanError;
   }
-  throw new Error(`expected a TrackerError with code ${code}`);
+  throw new Error(`expected a PikabanError with code ${code}`);
 }

@@ -12,7 +12,7 @@ import { contentHash } from "../../src/core/fs.js";
 import { openProject, type Project } from "../../src/core/project.js";
 import { ULID_RE, type TaskPatch } from "../../src/core/schema.js";
 import { appendNote, changeShort, create, get, list, remove, update } from "../../src/core/tasks.js";
-import { CONFIG, copyValidFixtures, fixtures, makeProject, removeDir, taskText, tempDir, trackerError } from "../helpers.js";
+import { CONFIG, copyValidFixtures, fixtures, makeProject, removeDir, taskText, tempDir, pikabanError } from "../helpers.js";
 
 let root: string;
 let p: Project;
@@ -63,8 +63,8 @@ describe("create", () => {
   });
 
   it("gives code 7 for an empty title or an unknown category, and writes nothing", () => {
-    trackerError(EXIT_VALIDATION, () => create(p, { title: " " }));
-    trackerError(EXIT_VALIDATION, () => create(p, { title: "x", category: "later" }));
+    pikabanError(EXIT_VALIDATION, () => create(p, { title: " " }));
+    pikabanError(EXIT_VALIDATION, () => create(p, { title: "x", category: "later" }));
     expect(readdirSync(tasksDir)).toEqual([]);
   });
 });
@@ -133,15 +133,15 @@ describe("get", () => {
   });
 
   it("gives code 3 for an unknown task, with a hint about invalid files", () => {
-    trackerError(EXIT_NOT_FOUND, () => get(p, "7"));
+    pikabanError(EXIT_NOT_FOUND, () => get(p, "7"));
     writeFileSync(join(tasksDir, "bad.md"), "x");
-    expect(trackerError(EXIT_NOT_FOUND, () => get(p, "7")).message).toMatch(/not valid/);
+    expect(pikabanError(EXIT_NOT_FOUND, () => get(p, "7")).message).toMatch(/not valid/);
   });
 
   it("gives code 4 with both ULIDs when two tasks have one short name", () => {
     const other = "01JA2BAD4D5E6F7G8H9J0KMNPV";
     writeFileSync(join(tasksDir, `task-0042-${other}.md`), taskText({ id: other, short: "task-0042" }));
-    const err = trackerError(EXIT_AMBIGUOUS, () => get(p, "task-0042"));
+    const err = pikabanError(EXIT_AMBIGUOUS, () => get(p, "task-0042"));
     expect(err.message).toContain("01JA2B3C4D5E6F7G8H9J0KMNPQ");
     expect(err.message).toContain(other);
     expect(get(p, other).id).toBe(other);
@@ -182,7 +182,7 @@ describe("update", () => {
     const t = create(p, { title: "x" });
     const u = update(p, t.id, { title: "y" }, { ifMatch: t.etag });
     const text = readFileSync(t.file, "utf8");
-    trackerError(EXIT_CONFLICT, () => update(p, t.id, { title: "z" }, { ifMatch: t.etag }));
+    pikabanError(EXIT_CONFLICT, () => update(p, t.id, { title: "z" }, { ifMatch: t.etag }));
     expect(readFileSync(t.file, "utf8")).toBe(text);
     expect(update(p, t.id, { title: "z" }, { ifMatch: u.etag }).title).toBe("z");
   });
@@ -190,17 +190,17 @@ describe("update", () => {
   it("gives code 5 after a direct body edit", () => {
     const t = create(p, { title: "x", body: "a" });
     writeFileSync(t.file, `${readFileSync(t.file, "utf8")}edited by the agent\n`);
-    trackerError(EXIT_CONFLICT, () => update(p, t.id, { title: "y" }, { ifMatch: t.etag }));
+    pikabanError(EXIT_CONFLICT, () => update(p, t.id, { title: "y" }, { ifMatch: t.etag }));
   });
 
   it("gives code 7 for id, short or timestamps in the patch, and for invalid values", () => {
     const t = create(p, { title: "x" });
     for (const patch of [{ id: "01JA2B3C4D5E6F7G8H9J0KMNPQ" }, { short: "task-0009" }, { created_at: t.created_at }]) {
-      trackerError(EXIT_VALIDATION, () => update(p, t.id, patch as TaskPatch));
+      pikabanError(EXIT_VALIDATION, () => update(p, t.id, patch as TaskPatch));
     }
-    trackerError(EXIT_VALIDATION, () => update(p, t.id, { category: "later" }));
-    trackerError(EXIT_VALIDATION, () => update(p, t.id, { title: "" }));
-    trackerError(EXIT_VALIDATION, () => update(p, t.id, { assignee: "bob" } as unknown as TaskPatch));
+    pikabanError(EXIT_VALIDATION, () => update(p, t.id, { category: "later" }));
+    pikabanError(EXIT_VALIDATION, () => update(p, t.id, { title: "" }));
+    pikabanError(EXIT_VALIDATION, () => update(p, t.id, { assignee: "bob" } as unknown as TaskPatch));
     expect(get(p, t.id)).toEqual(t);
   });
 
@@ -214,7 +214,7 @@ describe("changeShort", () => {
   it("gives code 5 if the file changed after the read", () => {
     const t = create(p, { title: "x" });
     writeFileSync(t.file, `${readFileSync(t.file, "utf8")}more\n`);
-    trackerError(EXIT_CONFLICT, () => changeShort(p, t, "task-0002"));
+    pikabanError(EXIT_CONFLICT, () => changeShort(p, t, "task-0002"));
     expect(existsSync(t.file)).toBe(true);
     expect(readdirSync(tasksDir)).toHaveLength(1);
   });
@@ -238,8 +238,8 @@ describe("appendNote", () => {
 
   it("checks ifMatch and rejects an empty note", () => {
     const t = create(p, { title: "x" });
-    trackerError(EXIT_CONFLICT, () => appendNote(p, t.id, "n", { ifMatch: "0" }));
-    trackerError(EXIT_VALIDATION, () => appendNote(p, t.id, " \n"));
+    pikabanError(EXIT_CONFLICT, () => appendNote(p, t.id, "n", { ifMatch: "0" }));
+    pikabanError(EXIT_VALIDATION, () => appendNote(p, t.id, " \n"));
   });
 });
 
@@ -248,13 +248,13 @@ describe("remove", () => {
     const t = create(p, { title: "x" });
     remove(p, t.short);
     expect(existsSync(t.file)).toBe(false);
-    trackerError(EXIT_NOT_FOUND, () => get(p, t.id));
+    pikabanError(EXIT_NOT_FOUND, () => get(p, t.id));
   });
 
   it("gives code 5 with an old ifMatch and keeps the file", () => {
     const t = create(p, { title: "x" });
     const u = update(p, t.id, { title: "y" });
-    trackerError(EXIT_CONFLICT, () => remove(p, t.id, { ifMatch: t.etag }));
+    pikabanError(EXIT_CONFLICT, () => remove(p, t.id, { ifMatch: t.etag }));
     expect(existsSync(t.file)).toBe(true);
     remove(p, t.id, { ifMatch: u.etag });
     expect(existsSync(t.file)).toBe(false);
@@ -283,8 +283,8 @@ describe("schema version", () => {
   it("version 2 gives code 6 for all operations", () => {
     copyValidFixtures(root);
     projectWithVersion(2);
-    trackerError(EXIT_SCHEMA_VERSION, () => openProject(root));
-    trackerError(EXIT_SCHEMA_VERSION, () => openProject(root, { write: true }));
+    pikabanError(EXIT_SCHEMA_VERSION, () => openProject(root));
+    pikabanError(EXIT_SCHEMA_VERSION, () => openProject(root, { write: true }));
   });
 
   it("version 0 gives code 6 for writes only", () => {
@@ -293,11 +293,11 @@ describe("schema version", () => {
     const old = openProject(root);
     expect(list(old).tasks).toHaveLength(4);
     expect(get(old, "42").title).toBe("Implement OAuth2 authentication");
-    trackerError(EXIT_SCHEMA_VERSION, () => create(old, { title: "x" }));
-    trackerError(EXIT_SCHEMA_VERSION, () => update(old, "42", { title: "x" }));
-    trackerError(EXIT_SCHEMA_VERSION, () => appendNote(old, "42", "x"));
-    trackerError(EXIT_SCHEMA_VERSION, () => remove(old, "42"));
-    trackerError(EXIT_SCHEMA_VERSION, () => openProject(root, { write: true }));
+    pikabanError(EXIT_SCHEMA_VERSION, () => create(old, { title: "x" }));
+    pikabanError(EXIT_SCHEMA_VERSION, () => update(old, "42", { title: "x" }));
+    pikabanError(EXIT_SCHEMA_VERSION, () => appendNote(old, "42", "x"));
+    pikabanError(EXIT_SCHEMA_VERSION, () => remove(old, "42"));
+    pikabanError(EXIT_SCHEMA_VERSION, () => openProject(root, { write: true }));
     expect(readdirSync(tasksDir)).toHaveLength(4);
   });
 });

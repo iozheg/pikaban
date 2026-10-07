@@ -11,10 +11,10 @@ beforeEach(() => {
 });
 afterEach(() => sb.cleanup());
 
-const projectSkill = () => join(sb.dir, ".claude", "skills", "tracker", "SKILL.md");
-const userSkill = () => join(sb.home, ".claude", "skills", "tracker", "SKILL.md");
+const projectSkill = () => join(sb.dir, ".claude", "skills", "pikaban", "SKILL.md");
+const userSkill = () => join(sb.home, ".claude", "skills", "pikaban", "SKILL.md");
 const projectSettings = () => join(sb.dir, ".claude", "settings.json");
-const globalConfig = () => join(sb.home, ".tracker_config.json");
+const globalConfig = () => join(sb.home, ".pikaban_config.json");
 
 /** All files under `dir` (relative paths). */
 function files(dir: string, prefix = ""): string[] {
@@ -29,18 +29,18 @@ function expectNothingWritten(): void {
   expect(files(sb.home)).toEqual([]);
 }
 
-describe("tracker init: flags", () => {
+describe("pikaban init: flags", () => {
   it("all flags given: no questions, the correct files are made", () => {
     const r = sb.run(["init", "--skill", "project", "--allow"]);
     expect(r.code, r.stderr).toBe(0);
-    expect(r.stdout).toContain("tracker init will make these changes");
+    expect(r.stdout).toContain("pikaban init will make these changes");
     expect(r.stdout).not.toMatch(/\?/); // no question was asked
-    expect(r.stdout).toContain('Next: tracker add "<title>"');
+    expect(r.stdout).toContain('Next: pikaban add "<title>"');
     expect(files(sb.dir).sort()).toEqual(
-      [".claude/settings.json", ".claude/skills/tracker/SKILL.md", ".tracker/config.json"].sort(),
+      [".claude/settings.json", ".claude/skills/pikaban/SKILL.md", ".pikaban/config.json"].sort(),
     );
-    expect(existsSync(join(sb.dir, ".tracker", "tasks"))).toBe(true);
-    expect(JSON.parse(readFileSync(projectSettings(), "utf8"))).toEqual({ permissions: { allow: ["Bash(tracker:*)"] } });
+    expect(existsSync(join(sb.dir, ".pikaban", "tasks"))).toBe(true);
+    expect(JSON.parse(readFileSync(projectSettings(), "utf8"))).toEqual({ permissions: { allow: ["Bash(pikaban:*)"] } });
     expect(JSON.parse(readFileSync(globalConfig(), "utf8")).projects).toEqual([sb.dir]);
     expect(existsSync(userSkill())).toBe(false);
   });
@@ -70,7 +70,7 @@ describe("tracker init: flags", () => {
     expect(sb.json(["init", "--skill", "none", "--allow"]).permission.status).toBe("added");
     expect(JSON.parse(readFileSync(projectSettings(), "utf8"))).toEqual({
       env: { X: "1" },
-      permissions: { allow: ["Read", "Bash(tracker:*)"] },
+      permissions: { allow: ["Read", "Bash(pikaban:*)"] },
     });
     expect(existsSync(`${projectSettings()}.bak`)).toBe(true);
   });
@@ -92,7 +92,7 @@ describe("tracker init: flags", () => {
   });
 });
 
-describe("tracker init: errors write nothing", () => {
+describe("pikaban init: errors write nothing", () => {
   it.each([
     [[], ["--skill <project|user|none>", "--allow or --no-allow"]],
     [["--skill", "project"], ["--allow or --no-allow"]],
@@ -118,7 +118,7 @@ describe("tracker init: errors write nothing", () => {
     writeFileSync(projectSettings(), "{ nope");
     const r = sb.run(["init", "--skill", "project", "--allow"]);
     expect(r.code).toBe(7);
-    expect(existsSync(join(sb.dir, ".tracker"))).toBe(false);
+    expect(existsSync(join(sb.dir, ".pikaban"))).toBe(false);
     expect(existsSync(projectSkill())).toBe(false);
     expect(files(sb.dir)).toEqual([".claude/settings.json"]);
     expect(readFileSync(projectSettings(), "utf8")).toBe("{ nope");
@@ -131,25 +131,25 @@ describe("tracker init: errors write nothing", () => {
     expect(r.code).toBe(5);
     expect(r.stderr).toContain("-my own skill");
     expect(r.stderr).toContain("--skill none");
-    expect(existsSync(join(sb.dir, ".tracker"))).toBe(false);
+    expect(existsSync(join(sb.dir, ".pikaban"))).toBe(false);
     expect(readFileSync(projectSkill(), "utf8")).toBe("my own skill\n");
   });
 
-  it("a step after .tracker/ fails: .tracker/ stays, the message tells what is done and what to run", () => {
-    // A file where the .claude folder must be: the skill install fails after .tracker/ is made.
+  it("a step after .pikaban/ fails: .pikaban/ stays, the message tells what is done and what to run", () => {
+    // A file where the .claude folder must be: the skill install fails after .pikaban/ is made.
     writeFileSync(join(sb.dir, ".claude"), "not a folder");
     const r = sb.run(["init", "--skill", "project", "--no-allow"]);
     expect(r.code).toBe(1);
-    expect(r.stderr).toContain("tracker init stopped");
+    expect(r.stderr).toContain("pikaban init stopped");
     expect(r.stderr).toContain("Done: made");
     expect(r.stderr).toContain("added the project to the global config");
-    expect(r.stderr).toContain(`tracker -C ${JSON.stringify(sb.dir)} skill install --project`);
-    expect(existsSync(join(sb.dir, ".tracker", "config.json"))).toBe(true);
+    expect(r.stderr).toContain(`pikaban -C ${JSON.stringify(sb.dir)} skill install --project`);
+    expect(existsSync(join(sb.dir, ".pikaban", "config.json"))).toBe(true);
     expect(JSON.parse(readFileSync(globalConfig(), "utf8")).projects).toEqual([sb.dir]);
   });
 });
 
-describe("tracker init: git", () => {
+describe("pikaban init: git", () => {
   /** A hash of each file in .git/ (path, size, content). */
   function gitSnapshot(dir: string): string[] {
     return files(join(dir, ".git")).map((f) => {
@@ -167,6 +167,6 @@ describe("tracker init: git", () => {
     expect(gitSnapshot(sb.dir)).toEqual(before);
     const status = execFileSync("git", ["status", "--porcelain"], { cwd: sb.dir, encoding: "utf8" });
     // Only untracked files: nothing is staged, nothing is excluded.
-    expect(status.split("\n").filter(Boolean).sort()).toEqual(["?? .claude/", "?? .tracker/", "?? README.md"]);
+    expect(status.split("\n").filter(Boolean).sort()).toEqual(["?? .claude/", "?? .pikaban/", "?? README.md"]);
   });
 });

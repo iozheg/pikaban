@@ -17,7 +17,7 @@ beforeEach(() => {
   root = tempDir("check");
   makeProject(root);
   copyValidFixtures(root);
-  tasksDir = join(root, ".tracker", "tasks");
+  tasksDir = join(root, ".pikaban", "tasks");
 });
 
 afterEach(() => {

@@ -4,16 +4,16 @@ import {
   EXIT_NOT_FOUND,
   EXIT_SCHEMA_VERSION,
   EXIT_VALIDATION,
-  TrackerError,
+  PikabanError,
 } from "./errors.js";
 import { ProjectConfigSchema, SCHEMA_VERSION, validate, type ProjectConfig } from "./schema.js";
 
-export const TRACKER_DIR = ".tracker";
+export const PIKABAN_DIR = ".pikaban";
 
 export interface ProjectPaths {
-  /** The project folder (the parent of `.tracker/`). */
+  /** The project folder (the parent of `.pikaban/`). */
   root: string;
-  trackerDir: string;
+  pikabanDir: string;
   tasksDir: string;
   configFile: string;
 }
@@ -24,16 +24,16 @@ export interface Project extends ProjectPaths {
 
 export function projectPaths(root: string): ProjectPaths {
   const abs = resolve(root);
-  const trackerDir = join(abs, TRACKER_DIR);
+  const pikabanDir = join(abs, PIKABAN_DIR);
   return {
     root: abs,
-    trackerDir,
-    tasksDir: join(trackerDir, "tasks"),
-    configFile: join(trackerDir, "config.json"),
+    pikabanDir,
+    tasksDir: join(pikabanDir, "tasks"),
+    configFile: join(pikabanDir, "config.json"),
   };
 }
 
-/** Searches up from `startDir` for `.tracker/config.json`. Returns the project folder, or code 3. */
+/** Searches up from `startDir` for `.pikaban/config.json`. Returns the project folder, or code 3. */
 export function findProject(startDir: string): string {
   let dir = resolve(startDir);
   for (;;) {
@@ -42,9 +42,9 @@ export function findProject(startDir: string): string {
     if (parent === dir) break;
     dir = parent;
   }
-  throw new TrackerError(
+  throw new PikabanError(
     EXIT_NOT_FOUND,
-    `no ${TRACKER_DIR}/ folder in ${resolve(startDir)} or its parent folders. Run "tracker init" to make one.`,
+    `no ${PIKABAN_DIR}/ folder in ${resolve(startDir)} or its parent folders. Run "pikaban init" to make one.`,
   );
 }
 
@@ -55,14 +55,14 @@ export function readRawConfig(configFile: string): unknown {
     text = readFileSync(configFile, "utf8");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new TrackerError(EXIT_NOT_FOUND, `project config not found: ${configFile}`, { cause: err });
+      throw new PikabanError(EXIT_NOT_FOUND, `project config not found: ${configFile}`, { cause: err });
     }
     throw err;
   }
   try {
     return JSON.parse(text);
   } catch (err) {
-    throw new TrackerError(EXIT_VALIDATION, `${configFile}: invalid JSON: ${(err as Error).message}`, {
+    throw new PikabanError(EXIT_VALIDATION, `${configFile}: invalid JSON: ${(err as Error).message}`, {
       cause: err,
     });
   }
@@ -89,15 +89,15 @@ export function assertWritable(p: Project): void {
 
 function checkSchemaVersion(version: number, source: string, write: boolean): void {
   if (version > SCHEMA_VERSION) {
-    throw new TrackerError(
+    throw new PikabanError(
       EXIT_SCHEMA_VERSION,
-      `${source}: schema version ${version} is newer than this CLI (version ${SCHEMA_VERSION}). Update the tracker CLI.`,
+      `${source}: schema version ${version} is newer than this CLI (version ${SCHEMA_VERSION}). Update the pikaban CLI.`,
     );
   }
   if (version < SCHEMA_VERSION && write) {
-    throw new TrackerError(
+    throw new PikabanError(
       EXIT_SCHEMA_VERSION,
-      `${source}: schema version ${version} is older than this CLI (version ${SCHEMA_VERSION}). Run "tracker migrate".`,
+      `${source}: schema version ${version} is older than this CLI (version ${SCHEMA_VERSION}). Run "pikaban migrate".`,
     );
   }
 }

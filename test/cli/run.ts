@@ -14,9 +14,9 @@ export interface RunResult {
 export interface Sandbox {
   /** The project folder (empty at the start). */
   dir: string;
-  /** TRACKER_HOME: the folder of .tracker_config.json. */
+  /** PIKABAN_HOME: the folder of .pikaban_config.json. */
   home: string;
-  /** Runs the built CLI in `dir` (or `opts.cwd`) with TRACKER_HOME = `home`. */
+  /** Runs the built CLI in `dir` (or `opts.cwd`) with PIKABAN_HOME = `home`. */
   run(args: string[], opts?: { cwd?: string; input?: string }): RunResult;
   /** Runs with `--json`, expects exit code 0 and returns the parsed stdout. */
   json<T = any>(args: string[], opts?: { cwd?: string; input?: string }): T;
@@ -35,7 +35,7 @@ export function sandbox(): Sandbox {
       cwd: opts.cwd ?? dir,
       input: opts.input ?? "",
       encoding: "utf8",
-      env: { ...process.env, TRACKER_HOME: home },
+      env: { ...process.env, PIKABAN_HOME: home },
     });
     return { code: r.status, stdout: r.stdout, stderr: r.stderr };
   };

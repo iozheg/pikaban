@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import { basename } from "node:path";
-import { EXIT_GENERAL, EXIT_NOT_FOUND, TrackerError } from "./errors.js";
+import { EXIT_GENERAL, EXIT_NOT_FOUND, PikabanError } from "./errors.js";
 import { createExclusive } from "./fs.js";
-import { projectPaths, TRACKER_DIR, type ProjectPaths } from "./project.js";
+import { projectPaths, PIKABAN_DIR, type ProjectPaths } from "./project.js";
 import { categoriesWith, DEFAULT_OPTIONAL_CATEGORIES } from "./categories.js";
 import { ProjectConfigSchema, SCHEMA_VERSION, validate, type ProjectConfig } from "./schema.js";
 
@@ -26,20 +26,20 @@ export function projectIdFrom(folderName: string): string {
   return id === "" ? "project" : id;
 }
 
-function alreadyInitialized(root: string): TrackerError {
-  return new TrackerError(EXIT_GENERAL, `${TRACKER_DIR}/ already exists in ${root}. The project is already initialized.`);
+function alreadyInitialized(root: string): PikabanError {
+  return new PikabanError(EXIT_GENERAL, `${PIKABAN_DIR}/ already exists in ${root}. The project is already initialized.`);
 }
 
 /**
  * The checks before `initProject`. Writes nothing. Returns the config to write.
- * Code 3 if `root` is not a folder, code 1 if `.tracker/` already exists, code 7 for an invalid config.
+ * Code 3 if `root` is not a folder, code 1 if `.pikaban/` already exists, code 7 for an invalid config.
  */
 export function prepareInit(root: string, opts: InitOptions = {}): ProjectConfig {
   const paths = projectPaths(root);
   if (!existsSync(paths.root) || !statSync(paths.root).isDirectory()) {
-    throw new TrackerError(EXIT_NOT_FOUND, `folder not found: ${paths.root}`);
+    throw new PikabanError(EXIT_NOT_FOUND, `folder not found: ${paths.root}`);
   }
-  if (existsSync(paths.trackerDir)) throw alreadyInitialized(paths.root);
+  if (existsSync(paths.pikabanDir)) throw alreadyInitialized(paths.root);
   const folder = basename(paths.root);
   return validate(
     ProjectConfigSchema,
@@ -54,13 +54,13 @@ export function prepareInit(root: string, opts: InitOptions = {}): ProjectConfig
 }
 
 /**
- * Makes `<root>/.tracker/tasks/` and `<root>/.tracker/config.json` with `config` from `prepareInit`
- * (design 5). Code 1 if `.tracker/` exists now. Does not change the global config and does not run git.
+ * Makes `<root>/.pikaban/tasks/` and `<root>/.pikaban/config.json` with `config` from `prepareInit`
+ * (design 5). Code 1 if `.pikaban/` exists now. Does not change the global config and does not run git.
  */
 export function initProject(root: string, config: ProjectConfig): ProjectPaths {
   const paths = projectPaths(root);
   try {
-    mkdirSync(paths.trackerDir); // Not recursive: fails if another process made it after the checks.
+    mkdirSync(paths.pikabanDir); // Not recursive: fails if another process made it after the checks.
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "EEXIST") throw alreadyInitialized(paths.root);
     throw err;

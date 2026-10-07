@@ -15,20 +15,20 @@ import * as set from "./commands/set.js";
 import * as show from "./commands/show.js";
 import * as skill from "./commands/skill.js";
 import * as ui from "./commands/ui.js";
-import { argvHasJson, TRACKER_HOME_ENV } from "./context.js";
+import { argvHasJson, PIKABAN_HOME_ENV } from "./context.js";
 import { Output } from "./output.js";
 
 /**
  * The program. `-C` and `--json` are options of the root command. Commander reads root options
- * before and after the subcommand name, so `tracker --json list` and `tracker list --json` both work.
+ * before and after the subcommand name, so `pikaban --json list` and `pikaban list --json` both work.
  * Commands read them with `cmd.optsWithGlobals()` (see `contextOf`).
  */
 export function buildProgram(json: boolean): Command {
   const program = new Command()
-    .name("tracker")
+    .name("pikaban")
     .description(pkg.description)
     .version(pkg.version)
-    .addOption(new Option("-C <path>", "project folder (default: search up from the current folder for .tracker/)"))
+    .addOption(new Option("-C <path>", "project folder (default: search up from the current folder for .pikaban/)"))
     .option("--json", "JSON output: stdout has only JSON, errors go to stderr as JSON")
     // Set before the subcommands are added, so that they inherit it.
     .exitOverride()
@@ -41,7 +41,7 @@ export function buildProgram(json: boolean): Command {
     })
     .addHelpText(
       "after",
-      `\nEnvironment:\n  ${TRACKER_HOME_ENV}  the home folder for tracker: the folder of .tracker_config.json, and of\n` +
+      `\nEnvironment:\n  ${PIKABAN_HOME_ENV}  the home folder for pikaban: the folder of .pikaban_config.json, and of\n` +
         "                .claude/ for the user skill and the user settings.json (default: the home folder)\n\n" +
         "Exit codes: 0 success, 1 general error, 2 incorrect usage, 3 not found, 4 short name has more\n" +
         "than one task, 5 conflict (a file changed, or the skill file has local changes), 6 schema version\n" +

@@ -42,7 +42,7 @@ export function register(program: Command): void {
         const force = setTimeout(() => process.exit(0), 3000);
         force.unref();
         void server.close().then(() => {
-          if (!ctx.json) process.stderr.write("Tracker UI stopped.\n");
+          if (!ctx.json) process.stderr.write("Pikaban UI stopped.\n");
           process.exit(0);
         });
       };
@@ -51,7 +51,7 @@ export function register(program: Command): void {
 
       ctx.out.result(
         { url: server.url, port: server.port },
-        `Tracker UI: ${server.url}\nPress Ctrl+C to stop.`,
+        `Pikaban UI: ${server.url}\nPress Ctrl+C to stop.`,
       );
       if (opts.open) {
         try {

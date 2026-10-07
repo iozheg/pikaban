@@ -22,7 +22,7 @@ afterEach(async () => {
 function runUi(args: string[]): { proc: ChildProcess; output: () => { stdout: string; stderr: string }; exited: Promise<number | null> } {
   const proc = spawn(process.execPath, [CLI, "ui", ...args], {
     cwd: env.base,
-    env: { ...process.env, TRACKER_HOME: env.home },
+    env: { ...process.env, PIKABAN_HOME: env.home },
     stdio: ["ignore", "pipe", "pipe"],
   });
   child = proc;
@@ -40,7 +40,7 @@ async function waitForUrl(output: () => { stdout: string; stderr: string }, exit
   let done = false;
   void exited.then(() => (done = true));
   while (Date.now() < deadline) {
-    const m = /Tracker UI: (http:\/\/\S+)/.exec(output().stdout);
+    const m = /Pikaban UI: (http:\/\/\S+)/.exec(output().stdout);
     if (m) return m[1]!;
     if (done) break;
     await new Promise((r) => setTimeout(r, 20));
@@ -48,7 +48,7 @@ async function waitForUrl(output: () => { stdout: string; stderr: string }, exit
   throw new Error(`no URL. stdout: ${output().stdout} stderr: ${output().stderr}`);
 }
 
-describe("tracker ui", () => {
+describe("pikaban ui", () => {
   it("--no-open --port <n> starts the server, answers GET /api/projects, and stops on SIGINT", async () => {
     const { pid } = env.project("alpha");
     const port = await freePort();

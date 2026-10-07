@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { basename, join } from "node:path";
-import { EXIT_CONFLICT, EXIT_VALIDATION, TrackerError } from "./errors.js";
+import { EXIT_CONFLICT, EXIT_VALIDATION, PikabanError } from "./errors.js";
 import { parseTaskFile, serializeTaskFile } from "./frontmatter.js";
 import { atomicWrite, contentHash, createExclusive } from "./fs.js";
 import { fileName, newUlid, nextShort, resolveRef } from "./ids.js";
@@ -46,7 +46,7 @@ export interface WriteOptions {
   ifMatch?: string;
 }
 
-/** Reads all `*.md` files at depth 0 of `.tracker/tasks/`. */
+/** Reads all `*.md` files at depth 0 of `.pikaban/tasks/`. */
 export function list(p: Project, filter: TaskFilter = {}): TaskList {
   const tasks: Task[] = [];
   const invalid: InvalidTaskFile[] = [];
@@ -72,7 +72,7 @@ export function list(p: Project, filter: TaskFilter = {}): TaskList {
 /** Finds one task by short name or ULID. Codes 3 and 4. */
 export function get(p: Project, ref: string): Task {
   const { tasks, invalid } = list(p);
-  const hint = invalid.length > 0 ? ` (${invalid.length} task file(s) are not valid: run "tracker check")` : "";
+  const hint = invalid.length > 0 ? ` (${invalid.length} task file(s) are not valid: run "pikaban check")` : "";
   return resolveRef(tasks, ref, hint);
 }
 
@@ -113,7 +113,7 @@ export function update(p: Project, ref: string, patch: TaskPatch, opts: WriteOpt
 /** Adds `text` to the end of the body, after a blank line. */
 export function appendNote(p: Project, ref: string, text: string, opts: WriteOptions = {}): Task {
   assertWritable(p);
-  if (text.trim() === "") throw new TrackerError(EXIT_VALIDATION, "note text must not be empty");
+  if (text.trim() === "") throw new PikabanError(EXIT_VALIDATION, "note text must not be empty");
   const task = get(p, ref);
   checkMatch(task, opts.ifMatch);
   const note = normalizeBody(text);
@@ -195,13 +195,13 @@ function assertUnchanged(task: Task): void {
     current = undefined;
   }
   if (current === undefined || contentHash(current) !== task.etag) {
-    throw new TrackerError(EXIT_CONFLICT, `${task.short}: the file changed during the operation. Try again.`);
+    throw new PikabanError(EXIT_CONFLICT, `${task.short}: the file changed during the operation. Try again.`);
   }
 }
 
 function checkMatch(task: Task, ifMatch: string | undefined): void {
   if (ifMatch !== undefined && ifMatch !== task.etag) {
-    throw new TrackerError(EXIT_CONFLICT, `${task.short}: the file changed. Load the task again.`);
+    throw new PikabanError(EXIT_CONFLICT, `${task.short}: the file changed. Load the task again.`);
   }
 }
 

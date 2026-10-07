@@ -8,21 +8,21 @@ import {
   EXIT_USAGE,
   findProject,
   openProject,
-  TrackerError,
+  PikabanError,
   type Assignee,
   type Project,
 } from "../core/index.js";
 import { Output } from "./output.js";
 
 /**
- * Environment variable for the home folder of the tracker: the folder of `.tracker_config.json`,
+ * Environment variable for the home folder of the pikaban: the folder of `.pikaban_config.json`,
  * and the base of `.claude/` for the user skill and the user `settings.json`. Default: the home
- * folder. Tests set it, so that they never touch the real `~/.tracker_config.json` or `~/.claude/`.
+ * folder. Tests set it, so that they never touch the real `~/.pikaban_config.json` or `~/.claude/`.
  */
-export const TRACKER_HOME_ENV = "TRACKER_HOME";
+export const PIKABAN_HOME_ENV = "PIKABAN_HOME";
 
 export function homeDir(): string {
-  const v = process.env[TRACKER_HOME_ENV];
+  const v = process.env[PIKABAN_HOME_ENV];
   return v ? resolve(v) : homedir();
 }
 
@@ -33,7 +33,7 @@ export interface Context {
   json: boolean;
   homeDir: string;
   out: Output;
-  /** Searches up from `startDir` for `.tracker/` and opens the project (code 3 or 6). */
+  /** Searches up from `startDir` for `.pikaban/` and opens the project (code 3 or 6). */
   project(opts: { write: boolean }): Project;
   /** The project folder (searched up from `startDir`). Code 3 if none. */
   projectRoot(): string;
@@ -45,7 +45,7 @@ export function contextOf(cmd: Command): Context {
   const startDir = resolve(g.C ?? process.cwd());
   const projectRoot = () => {
     // Do not search up from a -C folder that does not exist: that can find an unexpected project.
-    if (!existsSync(startDir)) throw new TrackerError(EXIT_NOT_FOUND, `folder not found: ${startDir}`);
+    if (!existsSync(startDir)) throw new PikabanError(EXIT_NOT_FOUND, `folder not found: ${startDir}`);
     return findProject(startDir);
   };
   return {
@@ -64,8 +64,8 @@ export function argvHasJson(argv: readonly string[]): boolean {
   return (end === -1 ? argv : argv.slice(0, end)).includes("--json");
 }
 
-export function usageError(message: string): TrackerError {
-  return new TrackerError(EXIT_USAGE, message);
+export function usageError(message: string): PikabanError {
+  return new PikabanError(EXIT_USAGE, message);
 }
 
 /** `agent`, `user` or `none` (null). Other text gives code 2. */
@@ -87,7 +87,7 @@ export function readTextFile(path: string): string {
   try {
     return readFileSync(path === "-" ? 0 : resolve(path), "utf8");
   } catch (err) {
-    throw new TrackerError(EXIT_GENERAL, `cannot read ${path}: ${(err as Error).message}`, { cause: err });
+    throw new PikabanError(EXIT_GENERAL, `cannot read ${path}: ${(err as Error).message}`, { cause: err });
   }
 }
 

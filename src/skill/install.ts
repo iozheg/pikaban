@@ -1,25 +1,25 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { atomicWrite, EXIT_GENERAL, TrackerError, type CheckIssue } from "../core/index.js";
+import { atomicWrite, EXIT_GENERAL, PikabanError, type CheckIssue } from "../core/index.js";
 import { lineDiff } from "./diff.js";
 import { CLI_VERSION, compareVersions } from "./version.js";
 
 export type SkillScope = "user" | "project";
 
-/** `--skill` answers of `tracker init`. */
+/** `--skill` answers of `pikaban init`. */
 export const SKILL_CHOICES = ["project", "user", "none"] as const;
 export type SkillChoice = (typeof SKILL_CHOICES)[number];
 
 const VERSION_PLACEHOLDER = "{{version}}";
-const VERSION_LINE = /<!--[ \t]*tracker-skill-version:[ \t]*(\S+?)[ \t]*-->/;
+const VERSION_LINE = /<!--[ \t]*pikaban-skill-version:[ \t]*(\S+?)[ \t]*-->/;
 
 /**
  * The skill file under `base`. `base` is the home folder (user scope) or the project folder.
- * Both give `<base>/.claude/skills/tracker/SKILL.md`.
+ * Both give `<base>/.claude/skills/pikaban/SKILL.md`.
  */
 export function skillFile(base: string): string {
-  return join(base, ".claude", "skills", "tracker", "SKILL.md");
+  return join(base, ".claude", "skills", "pikaban", "SKILL.md");
 }
 
 /** The Claude Code settings file under `base` (home folder or project folder). */
@@ -43,16 +43,16 @@ export function readSkillTemplate(): string {
   for (const file of candidates) {
     if (existsSync(file)) return readFileSync(file, "utf8");
   }
-  throw new TrackerError(
+  throw new PikabanError(
     EXIT_GENERAL,
-    `the skill text is not in the package (looked for ${candidates.join(", ")}). Reinstall the tracker CLI.`,
+    `the skill text is not in the package (looked for ${candidates.join(", ")}). Reinstall the pikaban CLI.`,
   );
 }
 
 /** The skill text with `version` in the version line. */
 export function renderSkill(template: string, version: string): string {
   if (!template.includes(VERSION_PLACEHOLDER)) {
-    throw new TrackerError(EXIT_GENERAL, `the skill template has no ${VERSION_PLACEHOLDER} placeholder`);
+    throw new PikabanError(EXIT_GENERAL, `the skill template has no ${VERSION_PLACEHOLDER} placeholder`);
   }
   return template.split(VERSION_PLACEHOLDER).join(version);
 }
@@ -62,7 +62,7 @@ export function packagedSkill(version = CLI_VERSION): string {
   return renderSkill(readSkillTemplate(), version);
 }
 
-/** The version in the `<!-- tracker-skill-version: X.Y.Z -->` line, or null if there is no such line. */
+/** The version in the `<!-- pikaban-skill-version: X.Y.Z -->` line, or null if there is no such line. */
 export function skillVersionOf(text: string): string | null {
   return VERSION_LINE.exec(text)?.[1] ?? null;
 }
@@ -97,11 +97,11 @@ export function planSkillInstall(file: string, text: string, opts: { force?: boo
 
   // Only an older version line is different: an automatic update.
   if (previousVersion !== null && compareVersions(previousVersion, version) === -1) {
-    const sameVersion = current.replace(VERSION_LINE, () => `<!-- tracker-skill-version: ${version} -->`);
+    const sameVersion = current.replace(VERSION_LINE, () => `<!-- pikaban-skill-version: ${version} -->`);
     if (sameVersion === text) return { status: "updated", file, version, previousVersion };
   }
 
-  const diff = lineDiff(current, text, { old: `${file} (installed)`, new: `skill text of tracker ${CLI_VERSION}` });
+  const diff = lineDiff(current, text, { old: `${file} (installed)`, new: `skill text of pikaban ${CLI_VERSION}` });
   return { status: opts.force ? "replaced" : "conflict", file, version, previousVersion, diff };
 }
 
@@ -120,7 +120,7 @@ export function installSkill(file: string, text: string, opts: { force?: boolean
 
 /** The command that installs the skill of `scope` (for messages). */
 export function skillInstallCommand(scope: SkillScope, opts: { force?: boolean; allow?: boolean; root?: string } = {}): string {
-  const parts = ["tracker"];
+  const parts = ["pikaban"];
   if (opts.root !== undefined) parts.push("-C", JSON.stringify(opts.root));
   parts.push("skill", "install");
   if (scope === "project") parts.push("--project");
@@ -130,7 +130,7 @@ export function skillInstallCommand(scope: SkillScope, opts: { force?: boolean; 
 }
 
 /**
- * `tracker check`: compares the version line of the installed skills (project and user scope)
+ * `pikaban check`: compares the version line of the installed skills (project and user scope)
  * with the CLI version. A skill that is not installed gives no issue (`init --skill none` is
  * a valid choice). A missing or older version line gives a warning.
  */
@@ -149,7 +149,7 @@ export function checkSkillVersions(opts: { projectRoot: string; homeDir: string;
     const fix = `Run "${skillInstallCommand(scope)}".`;
     let message: string | null = null;
     if (installed === null) {
-      message = `the ${scope} skill has no tracker-skill-version line. ${fix}`;
+      message = `the ${scope} skill has no pikaban-skill-version line. ${fix}`;
     } else {
       const cmp = compareVersions(installed, cli);
       if (cmp === null) message = `the ${scope} skill has an invalid version "${installed}". ${fix}`;

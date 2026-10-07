@@ -1,4 +1,4 @@
-/* Tracker board. Light and dark themes through CSS variables. No external fonts (CSP). */
+/* Pikaban board. Light and dark themes through CSS variables. No external fonts (CSP). */
 
 :root {
   color-scheme: light dark;

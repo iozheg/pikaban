@@ -9,7 +9,7 @@ import {
   get,
   listProjects,
   remove,
-  TrackerError,
+  PikabanError,
   ULID_RE,
   update,
   validate,
@@ -138,7 +138,7 @@ async function route(req: IncomingMessage, res: ServerResponse, pathname: string
   if (method === "PATCH") {
     const patch = (await readJsonBody(req)) as TaskPatch;
     if (patch !== null && typeof patch === "object" && !Array.isArray(patch) && Object.keys(patch).length === 0) {
-      throw new TrackerError(EXIT_VALIDATION, "request body: no fields to change");
+      throw new PikabanError(EXIT_VALIDATION, "request body: no fields to change");
     }
     const p = projectOf(ctx.homeDir, pid, { write: true });
     const task = withConflictBody(res, p, id, () => update(p, id, patch, { ifMatch }));
@@ -162,12 +162,12 @@ function withConflictBody<T>(res: ServerResponse, p: Project, id: string, fn: ()
   try {
     return fn();
   } catch (err) {
-    if (!(err instanceof TrackerError) || err.code !== EXIT_CONFLICT) throw err;
+    if (!(err instanceof PikabanError) || err.code !== EXIT_CONFLICT) throw err;
     let current: ApiTask | null = null;
     try {
       current = apiTask(get(p, id));
     } catch (e) {
-      if (!(e instanceof TrackerError && e.code === EXIT_NOT_FOUND)) throw e;
+      if (!(e instanceof PikabanError && e.code === EXIT_NOT_FOUND)) throw e;
     }
     sendError(res, err, { current });
     return undefined;

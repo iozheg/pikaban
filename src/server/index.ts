@@ -1,13 +1,13 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { EXIT_GENERAL, EXIT_USAGE, TrackerError } from "../core/index.js";
+import { EXIT_GENERAL, EXIT_USAGE, PikabanError } from "../core/index.js";
 import { failRequest } from "./http.js";
 import { handleApi } from "./routes.js";
 import { checkRequest } from "./security.js";
 import { defaultUiDir, serveStatic } from "./static.js";
-import { EventHub, TrackerWatcher, type TrackerEvent } from "./watcher.js";
+import { EventHub, PikabanWatcher, type PikabanEvent } from "./watcher.js";
 
-export type { TrackerEvent } from "./watcher.js";
+export type { PikabanEvent } from "./watcher.js";
 export { pidOf } from "./projects.js";
 
 export const DEFAULT_PORT = 4477;
@@ -15,10 +15,10 @@ export const DEFAULT_HOST = "127.0.0.1";
 /** Without `strictPort`, the server tries this number of ports, from `port` up. */
 export const PORT_TRIES = 20;
 /** Environment variable for dev mode (the Vite dev server origin is accepted). */
-export const UI_DEV_ENV = "TRACKER_UI_DEV";
+export const UI_DEV_ENV = "PIKABAN_UI_DEV";
 
 export interface ServerOptions {
-  /** The folder of `.tracker_config.json` (the same as the CLI: TRACKER_HOME or the home folder). */
+  /** The folder of `.pikaban_config.json` (the same as the CLI: PIKABAN_HOME or the home folder). */
   homeDir: string;
   /** Default: DEFAULT_PORT. 0 lets the system select a free port. */
   port?: number;
@@ -62,7 +62,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     const rawPath = q === -1 ? rawUrl : rawUrl.slice(0, q);
     try {
       checkRequest(req, { port, dev });
-      if (!rawPath.startsWith("/")) throw new TrackerError(EXIT_USAGE, "invalid request target");
+      if (!rawPath.startsWith("/")) throw new PikabanError(EXIT_USAGE, "invalid request target");
       if (rawPath === "/api" || rawPath.startsWith("/api/")) {
         void handleApi(req, res, rawPath, { homeDir: opts.homeDir, events });
         return;
@@ -78,7 +78,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const tries = opts.strictPort || first === 0 ? 1 : PORT_TRIES;
   port = await listen(server, host, first, tries);
 
-  const watcher = new TrackerWatcher(opts.homeDir, (e: TrackerEvent) => events.broadcast(e), {
+  const watcher = new PikabanWatcher(opts.homeDir, (e: PikabanEvent) => events.broadcast(e), {
     debounceMs: opts.debounceMs,
     onError: opts.onError,
   });
@@ -131,14 +131,14 @@ async function listen(server: Server, host: string, port: number, tries: number)
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code !== "EADDRINUSE" || p > 65535) {
-        throw new TrackerError(EXIT_GENERAL, `cannot start the server on ${host}:${p}: ${(err as Error).message}`, {
+        throw new PikabanError(EXIT_GENERAL, `cannot start the server on ${host}:${p}: ${(err as Error).message}`, {
           cause: err,
         });
       }
     }
   }
   const range = tries === 1 ? `Port ${port} is` : `Ports ${port} to ${port + tries - 1} are`;
-  throw new TrackerError(EXIT_GENERAL, `${range} in use. Use --port <n> with a free port.`);
+  throw new PikabanError(EXIT_GENERAL, `${range} in use. Use --port <n> with a free port.`);
 }
 
 function closeServer(server: Server): Promise<void> {

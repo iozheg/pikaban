@@ -1,5 +1,5 @@
 import { ulid } from "ulidx";
-import { EXIT_AMBIGUOUS, EXIT_GENERAL, EXIT_NOT_FOUND, EXIT_USAGE, TrackerError } from "./errors.js";
+import { EXIT_AMBIGUOUS, EXIT_GENERAL, EXIT_NOT_FOUND, EXIT_USAGE, PikabanError } from "./errors.js";
 import { ULID_RE } from "./schema.js";
 
 export const SHORT_MAX = 9999;
@@ -34,7 +34,7 @@ export function nextShort(liveTasks: readonly { id: string; short: string }[]): 
     n = (n % SHORT_MAX) + 1;
     if (!used.has(n)) return formatShort(n);
   }
-  throw new TrackerError(
+  throw new PikabanError(
     EXIT_GENERAL,
     `all ${SHORT_MAX} short names are in use. Delete tasks that you do not need.`,
   );
@@ -47,7 +47,7 @@ export function parseRef(text: string): TaskRef {
   const m = /^(?:task-)?(\d{1,4})$/i.exec(s);
   const n = m ? Number(m[1]) : 0;
   if (n < 1) {
-    throw new TrackerError(
+    throw new PikabanError(
       EXIT_USAGE,
       `"${text}" is not a task reference. Use a short name (task-0042, 0042, 42) or a full ULID.`,
     );
@@ -73,10 +73,10 @@ export function resolveRef<T extends { id: string; short: string }>(
   const found = r.kind === "id" ? items.filter((t) => t.id === r.id) : items.filter((t) => t.short === r.short);
   if (found.length === 1) return found[0]!;
   const what = r.kind === "id" ? r.id : r.short;
-  if (found.length === 0) throw new TrackerError(EXIT_NOT_FOUND, `task not found: ${what}${notFoundHint}`);
+  if (found.length === 0) throw new PikabanError(EXIT_NOT_FOUND, `task not found: ${what}${notFoundHint}`);
   const ids = found.map((t) => t.id).sort();
-  throw new TrackerError(
+  throw new PikabanError(
     EXIT_AMBIGUOUS,
-    `${what} has more than one task: ${ids.join(", ")}. Use the full ULID, or run "tracker check --fix".`,
+    `${what} has more than one task: ${ids.join(", ")}. Use the full ULID, or run "pikaban check --fix".`,
   );
 }

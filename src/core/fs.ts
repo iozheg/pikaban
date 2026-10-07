@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { closeSync, fsyncSync, openSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { EXIT_CONFLICT, TrackerError } from "./errors.js";
+import { EXIT_CONFLICT, PikabanError } from "./errors.js";
 
 function writeAndSync(fd: number, text: string): void {
   try {
@@ -23,14 +23,14 @@ export function atomicWrite(path: string, text: string): void {
   }
 }
 
-/** Makes a new file. If the file already exists, throws TrackerError code 5. */
+/** Makes a new file. If the file already exists, throws PikabanError code 5. */
 export function createExclusive(path: string, text: string): void {
   let fd: number;
   try {
     fd = openSync(path, "wx");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "EEXIST") {
-      throw new TrackerError(EXIT_CONFLICT, `file already exists: ${path}`, { cause: err });
+      throw new PikabanError(EXIT_CONFLICT, `file already exists: ${path}`, { cause: err });
     }
     throw err;
   }

@@ -47,12 +47,12 @@ export function defaultUiDir(): string {
 export const PLACEHOLDER_HTML = `<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tracker</title>
+<title>Pikaban</title>
 <style>body{font:16px/1.5 system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem}code{background:#eee;padding:0 .25rem}</style>
 </head>
 <body>
-<h1>Tracker UI server</h1>
-<p>The server operates, but the browser UI is not built. Run <code>npm run build</code> in the tracker package.</p>
+<h1>Pikaban UI server</h1>
+<p>The server operates, but the browser UI is not built. Run <code>npm run build</code> in the pikaban package.</p>
 <p>The API is available at <a href="/api/projects"><code>/api/projects</code></a>.</p>
 </body>
 </html>

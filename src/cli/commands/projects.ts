@@ -7,7 +7,7 @@ import {
   listProjects,
   projectPaths,
   removeProject,
-  TrackerError,
+  PikabanError,
 } from "../../core/index.js";
 import { contextOf, type Context } from "../context.js";
 
@@ -22,12 +22,12 @@ export function register(program: Command): void {
   projects
     .command("add")
     .description("add a project folder (default: the current project)")
-    .argument("[path]", "project folder that contains .tracker/")
+    .argument("[path]", "project folder that contains .pikaban/")
     .action((path: string | undefined, _opts: unknown, cmd: Command) => {
       const ctx = contextOf(cmd);
       const target = targetPath(ctx, path);
       if (!existsSync(projectPaths(target).configFile)) {
-        throw new TrackerError(EXIT_NOT_FOUND, `no .tracker/config.json in ${target}`);
+        throw new PikabanError(EXIT_NOT_FOUND, `no .pikaban/config.json in ${target}`);
       }
       const added = addProject(target, ctx.homeDir);
       ctx.out.result({ path: target, added }, added ? `added ${target}` : `${target} is already in the list`);
@@ -41,7 +41,7 @@ export function register(program: Command): void {
       const ctx = contextOf(cmd);
       const target = targetPath(ctx, path);
       if (!removeProject(target, ctx.homeDir)) {
-        throw new TrackerError(EXIT_NOT_FOUND, `${target} is not in the project list`);
+        throw new PikabanError(EXIT_NOT_FOUND, `${target} is not in the project list`);
       }
       ctx.out.result({ path: target, removed: true }, `removed ${target}`);
     });

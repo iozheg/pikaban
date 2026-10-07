@@ -14,7 +14,7 @@ import {
 import type { Context } from "../../src/cli/context.js";
 import { Output } from "../../src/cli/output.js";
 import type { Ask } from "../../src/cli/prompt.js";
-import { EXIT_GENERAL, EXIT_USAGE, TrackerError } from "../../src/core/errors.js";
+import { EXIT_GENERAL, EXIT_USAGE, PikabanError } from "../../src/core/errors.js";
 import { removeDir, tempDir } from "../helpers.js";
 
 let base: string;
@@ -76,7 +76,7 @@ function snapshot(dir: string, prefix = ""): Record<string, string> {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, e.name);
     if (e.isDirectory()) Object.assign(out, snapshot(p, `${prefix}${e.name}/`));
-    else if (e.name !== ".tracker_config.json") out[`${prefix}${e.name}`] = readFileSync(p, "utf8");
+    else if (e.name !== ".pikaban_config.json") out[`${prefix}${e.name}`] = readFileSync(p, "utf8");
   }
   return out;
 }
@@ -110,10 +110,10 @@ describe("resolveInitAnswers", () => {
 
   it("without a TTY, a missing answer gives code 2 with the missing flags", async () => {
     const err = await resolveInitAnswers({ skill: "none" }, { interactive: false }).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(TrackerError);
-    expect((err as TrackerError).code).toBe(EXIT_USAGE);
-    expect((err as TrackerError).message).toContain("--allow or --no-allow");
-    expect((err as TrackerError).message).not.toContain("--skill <");
+    expect(err).toBeInstanceOf(PikabanError);
+    expect((err as PikabanError).code).toBe(EXIT_USAGE);
+    expect((err as PikabanError).message).toContain("--allow or --no-allow");
+    expect((err as PikabanError).message).not.toContain("--skill <");
   });
 
   it("in a TTY, asks only the questions without a flag; empty answers give the defaults", async () => {
@@ -181,14 +181,14 @@ describe("resolveInitAnswers", () => {
 });
 
 describe("runInit with scripted answers", () => {
-  it("no to git: .tracker/ and the project skill go into .git/info/exclude", async () => {
+  it("no to git: .pikaban/ and the project skill go into .git/info/exclude", async () => {
     const a = setup("git-no");
     mkdirSync(join(a.dir, ".git"));
     const s = scripted({ categories: "review", git: "n", confirm: "y" });
     const r = await runInit(a.ctx, { skill: "project", allow: false }, { interactive: true, ask: s.ask });
     expect(r.answers).toEqual({ categories: ["review"], skill: "project", allow: false, git: false });
     expect(r.project.config.categories).toEqual(["todo", "in_progress", "review", "done"]);
-    expect(readFileSync(join(a.dir, ".git", "info", "exclude"), "utf8")).toBe("/.tracker/\n/.claude/skills/tracker/\n");
+    expect(readFileSync(join(a.dir, ".git", "info", "exclude"), "utf8")).toBe("/.pikaban/\n/.claude/skills/pikaban/\n");
     expect(stdout).toContain("categories: todo, in_progress, review, done");
   });
 
@@ -204,7 +204,7 @@ describe("runInit with scripted answers", () => {
     const s = scripted({ ...answers, confirm: "y" });
     const asked = await runInit(a.ctx, {}, { interactive: true, ask: s.ask });
     expect(s.asked).toHaveLength(4); // categories, skill, allow, confirmation
-    expect(stdout).toContain("tracker init will make these changes");
+    expect(stdout).toContain("pikaban init will make these changes");
 
     const b = setup(`${name}-flags`);
     const flagged = await runInit(b.ctx, flags, { interactive: false });
@@ -214,7 +214,7 @@ describe("runInit with scripted answers", () => {
     expect(asked.permission?.status).toBe(flagged.permission?.status);
     expect(snapshot(a.dir)).toEqual(snapshot(b.dir));
     expect(snapshot(a.home)).toEqual(snapshot(b.home));
-    expect(snapshot(a.dir)).toHaveProperty([".tracker/config.json"]);
+    expect(snapshot(a.dir)).toHaveProperty([".pikaban/config.json"]);
   });
 
   it("a confirmation answer of no (or empty) writes nothing", async () => {
@@ -238,6 +238,6 @@ describe("runInit with scripted answers", () => {
     const t = scripted({});
     await runInit(b.ctx, { yes: true }, { interactive: true, ask: t.ask });
     expect(t.asked).toEqual([]);
-    expect(existsSync(join(b.dir, ".claude", "skills", "tracker", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(b.dir, ".claude", "skills", "pikaban", "SKILL.md"))).toBe(true);
   });
 });

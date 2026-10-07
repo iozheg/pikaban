@@ -1,17 +1,17 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
-import { EXIT_VALIDATION, TrackerError } from "./errors.js";
+import { EXIT_VALIDATION, PikabanError } from "./errors.js";
 import { atomicWrite } from "./fs.js";
 import { GlobalConfigSchema, validate, type GlobalConfig } from "./schema.js";
 
-export const GLOBAL_CONFIG_NAME = ".tracker_config.json";
+export const GLOBAL_CONFIG_NAME = ".pikaban_config.json";
 
 export function globalConfigPath(homeDir = homedir()): string {
   return join(homeDir, GLOBAL_CONFIG_NAME);
 }
 
-/** Reads `~/.tracker_config.json`. A missing file gives an empty list. */
+/** Reads `~/.pikaban_config.json`. A missing file gives an empty list. */
 export function readGlobalConfig(homeDir = homedir()): GlobalConfig {
   const file = globalConfigPath(homeDir);
   let text: string;
@@ -25,7 +25,7 @@ export function readGlobalConfig(homeDir = homedir()): GlobalConfig {
   try {
     data = JSON.parse(text);
   } catch (err) {
-    throw new TrackerError(EXIT_VALIDATION, `${file}: invalid JSON: ${(err as Error).message}`, { cause: err });
+    throw new PikabanError(EXIT_VALIDATION, `${file}: invalid JSON: ${(err as Error).message}`, { cause: err });
   }
   return validate(GlobalConfigSchema, data, file);
 }

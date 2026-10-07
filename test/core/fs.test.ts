@@ -2,13 +2,13 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { EXIT_CONFLICT, TrackerError } from "../../src/core/errors.js";
+import { EXIT_CONFLICT, PikabanError } from "../../src/core/errors.js";
 import { atomicWrite, contentHash, createExclusive } from "../../src/core/fs.js";
 
 let dir: string;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "tracker-fs-"));
+  dir = mkdtempSync(join(tmpdir(), "pikaban-fs-"));
 });
 
 afterEach(() => {
@@ -46,7 +46,7 @@ describe("createExclusive", () => {
     expect(readFileSync(file, "utf8")).toBe("hello");
   });
 
-  it("stops with a TrackerError if the file exists, and does not change it", () => {
+  it("stops with a PikabanError if the file exists, and does not change it", () => {
     const file = join(dir, "old.md");
     writeFileSync(file, "old");
     let err: unknown;
@@ -55,8 +55,8 @@ describe("createExclusive", () => {
     } catch (e) {
       err = e;
     }
-    expect(err).toBeInstanceOf(TrackerError);
-    expect((err as TrackerError).code).toBe(EXIT_CONFLICT);
+    expect(err).toBeInstanceOf(PikabanError);
+    expect((err as PikabanError).code).toBe(EXIT_CONFLICT);
     expect(readFileSync(file, "utf8")).toBe("old");
   });
 });

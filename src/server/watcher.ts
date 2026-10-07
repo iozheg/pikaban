@@ -9,10 +9,10 @@ import { projectMap } from "./projects.js";
  * An SSE event (design 7.3). The `data` of each SSE message is this object as JSON.
  * - `changed`: a task file was made or changed. `id` is the ULID from the file name.
  * - `removed`: the task file is gone.
- * - `config`: `.tracker/config.json` of the project changed (or `.tracker/` was made or removed).
- * - `projects`: `~/.tracker_config.json` changed. No `pid`.
+ * - `config`: `.pikaban/config.json` of the project changed (or `.pikaban/` was made or removed).
+ * - `projects`: `~/.pikaban_config.json` changed. No `pid`.
  */
-export interface TrackerEvent {
+export interface PikabanEvent {
   type: "changed" | "removed" | "config" | "projects";
   pid?: string;
   /** The task ULID, from the file name `task-XXXX-<ULID>.md`. Missing if the file name has another form. */
@@ -62,7 +62,7 @@ export class EventHub {
     res.on("close", drop);
   }
 
-  broadcast(event: TrackerEvent): void {
+  broadcast(event: PikabanEvent): void {
     this.write(`data: ${JSON.stringify(event)}\n\n`);
   }
 
@@ -84,11 +84,11 @@ interface WatchedProject {
 }
 
 /**
- * Watches `.tracker/config.json` and `.tracker/tasks/*.md` (depth 0) of each project in the global
+ * Watches `.pikaban/config.json` and `.pikaban/tasks/*.md` (depth 0) of each project in the global
  * config, and the global config file (design 7.3). Events for the same task (or file) in a period of
- * `debounceMs` give one TrackerEvent. Initial "add" events are ignored.
+ * `debounceMs` give one PikabanEvent. Initial "add" events are ignored.
  */
-export class TrackerWatcher {
+export class PikabanWatcher {
   private readonly projects = new Map<string, WatchedProject>();
   private readonly timers = new Map<string, NodeJS.Timeout>();
   private globalWatcher: FSWatcher | undefined;
@@ -97,7 +97,7 @@ export class TrackerWatcher {
 
   constructor(
     private readonly homeDir: string,
-    private readonly emit: (event: TrackerEvent) => void,
+    private readonly emit: (event: PikabanEvent) => void,
     private readonly opts: { debounceMs?: number; onError?: (err: unknown) => void } = {},
   ) {}
 
@@ -168,18 +168,18 @@ export class TrackerWatcher {
   }
 
   private watchProject(pid: string, root: string): FSWatcher {
-    const { trackerDir, tasksDir, configFile } = projectPaths(root);
+    const { pikabanDir, tasksDir, configFile } = projectPaths(root);
     const isTaskFile = (p: string) => dirname(p) === tasksDir && p.endsWith(".md");
-    const watcher = this.makeWatcher(trackerDir, {
+    const watcher = this.makeWatcher(pikabanDir, {
       depth: 1,
       ignored: (p) => {
         const r = resolve(p);
-        return !(r === trackerDir || r === tasksDir || r === configFile || isTaskFile(r));
+        return !(r === pikabanDir || r === tasksDir || r === configFile || isTaskFile(r));
       },
     });
     watcher.on("all", (event, p) => {
       const r = resolve(p);
-      if (r === configFile || ((event === "addDir" || event === "unlinkDir") && (r === trackerDir || r === tasksDir))) {
+      if (r === configFile || ((event === "addDir" || event === "unlinkDir") && (r === pikabanDir || r === tasksDir))) {
         this.schedule(`${pid}:config`, () => this.emitIfOpen({ pid, type: "config" }));
         return;
       }
@@ -189,7 +189,7 @@ export class TrackerWatcher {
       // Key by ULID: `check --fix` renames a file (a new name with the same ULID).
       this.schedule(`${pid}:${id ?? name}`, () => {
         const current = currentFile(tasksDir, name, id);
-        const ev: TrackerEvent = { pid, type: current === undefined ? "removed" : "changed", file: current ?? name };
+        const ev: PikabanEvent = { pid, type: current === undefined ? "removed" : "changed", file: current ?? name };
         if (id !== undefined) ev.id = id;
         this.emitIfOpen(ev);
       });
@@ -216,7 +216,7 @@ export class TrackerWatcher {
     );
   }
 
-  private emitIfOpen(event: TrackerEvent): void {
+  private emitIfOpen(event: PikabanEvent): void {
     if (!this.closed) this.emit(event);
   }
 }

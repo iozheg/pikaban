@@ -9,7 +9,7 @@ import {
   EXIT_SCHEMA_VERSION,
   EXIT_USAGE,
   EXIT_VALIDATION,
-  TrackerError,
+  PikabanError,
 } from "../../src/core/errors.js";
 import {
   GlobalConfigSchema,
@@ -37,11 +37,11 @@ describe("errors", () => {
     ]).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
-  it("TrackerError carries the code", () => {
-    const err = new TrackerError(EXIT_NOT_FOUND, "no task");
+  it("PikabanError carries the code", () => {
+    const err = new PikabanError(EXIT_NOT_FOUND, "no task");
     expect(err).toBeInstanceOf(Error);
     expect(err.code).toBe(3);
-    expect(err.name).toBe("TrackerError");
+    expect(err.name).toBe("PikabanError");
   });
 });
 

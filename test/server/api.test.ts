@@ -36,7 +36,7 @@ describe("projects", () => {
     const newer = env.project("newer");
     writeConfig(newer.root, { ...openProject(newer.root).config, schema_version: 2 });
     const broken = env.project("broken");
-    writeFileSync(join(broken.root, ".tracker", "config.json"), "{");
+    writeFileSync(join(broken.root, ".pikaban", "config.json"), "{");
     const missing = join(env.base, "gone");
     addProject(missing, env.home);
 
@@ -56,7 +56,7 @@ describe("projects", () => {
     });
     expect(byName.alpha.config.categories).toEqual(["backlog", "todo", "in_progress", "done"]);
     expect(byName.old.status).toBe("schema_mismatch");
-    expect(byName.old.message).toContain("tracker migrate");
+    expect(byName.old.message).toContain("pikaban migrate");
     expect(byName.newer.status).toBe("schema_mismatch");
     expect(byName.newer.project_id).toBeNull();
     expect(byName.broken.status).toBe("invalid");
@@ -139,7 +139,7 @@ describe("tasks: full CRUD", () => {
     expect(u.json).toMatchObject({ title: "First!", category: "in_progress", assignee: "user", needs_input: true, body: "New body\n" });
     expect(u.headers.etag).toBe(`"${u.json.etag}"`);
     expect(u.json.etag).not.toBe(c.json.etag);
-    const text = readFileSync(join(a.root, ".tracker", "tasks", u.json.file), "utf8");
+    const text = readFileSync(join(a.root, ".pikaban", "tasks", u.json.file), "utf8");
     expect(text).toContain("title: First!");
 
     // update (If-Match without quotes)
@@ -154,7 +154,7 @@ describe("tasks: full CRUD", () => {
     const d = await request(server.port, "DELETE", `${base}/${c.json.id}`, { headers: { "If-Match": u2.headers.etag as string } });
     expect(d.status).toBe(204);
     expect(d.text).toBe("");
-    expect(readdirSync(join(a.root, ".tracker", "tasks"))).toEqual([c2.json.file]);
+    expect(readdirSync(join(a.root, ".pikaban", "tasks"))).toEqual([c2.json.file]);
     expect((await request(server.port, "GET", `${base}/${c.json.id}`)).status).toBe(404);
   });
 
@@ -183,7 +183,7 @@ describe("tasks: full CRUD", () => {
       headers: { "If-Match": `"${t.etag}"` },
     });
     expect(r.status).toBe(412);
-    expect(readdirSync(join(a.root, ".tracker", "tasks"))).toHaveLength(1);
+    expect(readdirSync(join(a.root, ".pikaban", "tasks"))).toHaveLength(1);
   });
 
   it("PATCH and DELETE without If-Match give 428", async () => {
@@ -223,13 +223,13 @@ describe("tasks: full CRUD", () => {
       expect(r.status, `${method} ${path} ${JSON.stringify(body)}: ${r.text}`).toBe(status);
       expect(r.json.error.message).toBeTypeOf("string");
     }
-    expect(readdirSync(join(a.root, ".tracker", "tasks"))).toHaveLength(1);
+    expect(readdirSync(join(a.root, ".pikaban", "tasks"))).toHaveLength(1);
   });
 
   it("invalid task files are in `invalid`, with the file name only", async () => {
     const a = env.project("alpha");
     create(openProject(a.root), { title: "Good" });
-    writeFileSync(join(a.root, ".tracker", "tasks", "task-0002-broken.md"), "no frontmatter");
+    writeFileSync(join(a.root, ".pikaban", "tasks", "task-0002-broken.md"), "no frontmatter");
     server = await start(env);
     const r = await request(server.port, "GET", `/api/projects/${a.pid}/tasks`);
     expect(r.json.tasks).toHaveLength(1);

@@ -5,7 +5,7 @@ import { EXIT_GENERAL, EXIT_NOT_FOUND, EXIT_VALIDATION } from "../../src/core/er
 import { initProject, prepareInit, projectIdFrom } from "../../src/core/init.js";
 import { openProject } from "../../src/core/project.js";
 import { create } from "../../src/core/tasks.js";
-import { removeDir, tempDir, trackerError } from "../helpers.js";
+import { removeDir, tempDir, pikabanError } from "../helpers.js";
 
 let base: string;
 let root: string;
@@ -22,7 +22,7 @@ afterEach(() => removeDir(base));
 describe("projectIdFrom", () => {
   it.each([
     ["My Project", "my-project"],
-    ["tasktracker", "tasktracker"],
+    ["pikaban", "pikaban"],
     ["a_b.c-d", "a_b.c-d"],
     ["  !!", "project"],
     [".hidden", "hidden"],
@@ -42,7 +42,7 @@ describe("prepareInit and initProject", () => {
     });
     const paths = initProject(root, config);
     expect(JSON.parse(readFileSync(paths.configFile, "utf8"))).toEqual(config);
-    expect(existsSync(join(home, ".tracker_config.json"))).toBe(false);
+    expect(existsSync(join(home, ".pikaban_config.json"))).toBe(false);
     const p = openProject(root, { write: true });
     expect(create(p, { title: "A" }).short).toBe("task-0001");
   });
@@ -52,20 +52,20 @@ describe("prepareInit and initProject", () => {
     expect(config).toMatchObject({ project_name: "N", project_id: "i", categories: ["a", "todo", "in_progress", "done"] });
   });
 
-  it("stops with code 1 if .tracker/ exists, in the checks and in the write", () => {
+  it("stops with code 1 if .pikaban/ exists, in the checks and in the write", () => {
     const config = prepareInit(root);
-    mkdirSync(join(root, ".tracker"));
-    trackerError(EXIT_GENERAL, () => prepareInit(root));
-    trackerError(EXIT_GENERAL, () => initProject(root, config));
-    expect(existsSync(join(root, ".tracker", "config.json"))).toBe(false);
+    mkdirSync(join(root, ".pikaban"));
+    pikabanError(EXIT_GENERAL, () => prepareInit(root));
+    pikabanError(EXIT_GENERAL, () => initProject(root, config));
+    expect(existsSync(join(root, ".pikaban", "config.json"))).toBe(false);
   });
 
   it("stops with code 3 if the folder does not exist", () => {
-    trackerError(EXIT_NOT_FOUND, () => prepareInit(join(base, "missing")));
+    pikabanError(EXIT_NOT_FOUND, () => prepareInit(join(base, "missing")));
   });
 
   it("stops with code 7 for invalid categories", () => {
-    trackerError(EXIT_VALIDATION, () => prepareInit(root, { categories: ["todo"] }));
-    expect(existsSync(join(root, ".tracker"))).toBe(false);
+    pikabanError(EXIT_VALIDATION, () => prepareInit(root, { categories: ["todo"] }));
+    expect(existsSync(join(root, ".pikaban"))).toBe(false);
   });
 });

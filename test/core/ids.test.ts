@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { EXIT_AMBIGUOUS, EXIT_GENERAL, EXIT_NOT_FOUND, EXIT_USAGE } from "../../src/core/errors.js";
 import { fileName, formatShort, newUlid, nextShort, parseRef, resolveRef } from "../../src/core/ids.js";
 import { ULID_RE } from "../../src/core/schema.js";
-import { trackerError } from "../helpers.js";
+import { pikabanError } from "../helpers.js";
 
 // ULIDs in ascending order.
 const A = "01JA2B3C4D5E6F7G8H9J0KMNPQ";
@@ -61,7 +61,7 @@ describe("nextShort", () => {
       id: `01JA2B3C4D5E6F7G8H9J${String(i).padStart(6, "0")}`,
       short: formatShort(i + 1),
     }));
-    const err = trackerError(EXIT_GENERAL, () => nextShort(tasks));
+    const err = pikabanError(EXIT_GENERAL, () => nextShort(tasks));
     expect(err.message).toMatch(/all 9999 short names are in use/);
   });
 });
@@ -81,7 +81,7 @@ describe("parseRef", () => {
 
   it("gives code 2 for other text", () => {
     for (const ref of ["", "0", "task-0000", "12345", "task-", "abc", "01JA2B3C4D5E6F7G8H9J0KMNP"]) {
-      trackerError(EXIT_USAGE, () => parseRef(ref));
+      pikabanError(EXIT_USAGE, () => parseRef(ref));
     }
   });
 });
@@ -105,12 +105,12 @@ describe("resolveRef", () => {
   });
 
   it("gives code 3 when nothing matches", () => {
-    trackerError(EXIT_NOT_FOUND, () => resolveRef(items, "7"));
-    trackerError(EXIT_NOT_FOUND, () => resolveRef(items, "01JA2BAB4D5E6F7G8H9J0KMNPZ"));
+    pikabanError(EXIT_NOT_FOUND, () => resolveRef(items, "7"));
+    pikabanError(EXIT_NOT_FOUND, () => resolveRef(items, "01JA2BAB4D5E6F7G8H9J0KMNPZ"));
   });
 
   it("gives code 4 with the ULIDs when two tasks have one short name", () => {
-    const err = trackerError(EXIT_AMBIGUOUS, () => resolveRef(items, "task-0042"));
+    const err = pikabanError(EXIT_AMBIGUOUS, () => resolveRef(items, "task-0042"));
     expect(err.message).toContain(A);
     expect(err.message).toContain(C);
   });

@@ -10,8 +10,8 @@ beforeEach(() => {
 });
 afterEach(() => sb.cleanup());
 
-const userSkill = () => join(sb.home, ".claude", "skills", "tracker", "SKILL.md");
-const projectSkill = () => join(sb.dir, ".claude", "skills", "tracker", "SKILL.md");
+const userSkill = () => join(sb.home, ".claude", "skills", "pikaban", "SKILL.md");
+const projectSkill = () => join(sb.dir, ".claude", "skills", "pikaban", "SKILL.md");
 const userSettings = () => join(sb.home, ".claude", "settings.json");
 const projectSettings = () => join(sb.dir, ".claude", "settings.json");
 
@@ -26,19 +26,19 @@ function initProject(): void {
   expect(r.code, r.stderr).toBe(0);
 }
 
-describe("tracker skill install", () => {
+describe("pikaban skill install", () => {
   it("the build copies SKILL.md to dist/skill/", () => {
     expect(readFileSync(join(CLI, "..", "skill", "SKILL.md"), "utf8")).toBe(
       readFileSync(join(import.meta.dirname, "..", "..", "src", "skill", "SKILL.md"), "utf8"),
     );
   });
 
-  it("user scope: installs into TRACKER_HOME/.claude, a second install does nothing", () => {
+  it("user scope: installs into PIKABAN_HOME/.claude, a second install does nothing", () => {
     const r = sb.run(["skill", "install"]);
     expect(r.code, r.stderr).toBe(0);
     expect(r.stdout).toContain("Installed the skill");
     expect(readFileSync(userSkill(), "utf8")).toBe(packaged());
-    expect(readFileSync(userSkill(), "utf8")).toContain(`<!-- tracker-skill-version: ${pkg.version} -->`);
+    expect(readFileSync(userSkill(), "utf8")).toContain(`<!-- pikaban-skill-version: ${pkg.version} -->`);
 
     const again = sb.json(["skill", "install"]);
     expect(again).toEqual({
@@ -70,7 +70,7 @@ describe("tracker skill install", () => {
     expect(human.code).toBe(5);
     expect(human.stderr).toContain("-## Exit codes (my notes)");
     expect(human.stderr).toContain("+## Exit codes");
-    expect(human.stderr).toContain("tracker skill install --force");
+    expect(human.stderr).toContain("pikaban skill install --force");
     const json = sb.run(["skill", "install", "--json"]);
     expect(json.code).toBe(5);
     expect(JSON.parse(json.stdout).skill).toMatchObject({ status: "conflict", diff: expect.stringContaining("my notes") });
@@ -88,14 +88,14 @@ describe("tracker skill install", () => {
     expect(readFileSync(userSkill(), "utf8")).toBe(packaged());
   });
 
-  it("--allow: user scope writes TRACKER_HOME/.claude/settings.json, --project the project settings", () => {
+  it("--allow: user scope writes PIKABAN_HOME/.claude/settings.json, --project the project settings", () => {
     mkdirSync(join(sb.home, ".claude"), { recursive: true });
     writeFileSync(userSettings(), JSON.stringify({ theme: "dark", permissions: { allow: ["Read"] } }));
     const out = sb.json(["skill", "install", "--allow"]);
     expect(out.permission).toEqual({ file: userSettings(), status: "added", backup: `${userSettings()}.bak` });
     expect(JSON.parse(readFileSync(userSettings(), "utf8"))).toEqual({
       theme: "dark",
-      permissions: { allow: ["Read", "Bash(tracker:*)"] },
+      permissions: { allow: ["Read", "Bash(pikaban:*)"] },
     });
     expect(sb.json(["skill", "install", "--allow"]).permission.status).toBe("present");
 
@@ -105,7 +105,7 @@ describe("tracker skill install", () => {
       status: "added",
       backup: null,
     });
-    expect(JSON.parse(readFileSync(projectSettings(), "utf8"))).toEqual({ permissions: { allow: ["Bash(tracker:*)"] } });
+    expect(JSON.parse(readFileSync(projectSettings(), "utf8"))).toEqual({ permissions: { allow: ["Bash(pikaban:*)"] } });
   });
 
   it("--allow with invalid settings JSON: code 7, nothing is written", () => {
@@ -119,7 +119,7 @@ describe("tracker skill install", () => {
   });
 });
 
-describe("tracker check: skill version", () => {
+describe("pikaban check: skill version", () => {
   it("no warning without a skill or with a current skill; a warning for an old skill", () => {
     initProject();
     expect(sb.json(["check"])).toEqual({ ok: true, issues: [] });
@@ -131,7 +131,7 @@ describe("tracker check: skill version", () => {
     writeFileSync(userSkill(), packaged("0.0.2"));
     const r = sb.run(["check"]);
     expect(r.code, r.stderr).toBe(0); // warnings only
-    expect(r.stdout).toContain(`warning: .claude/skills/tracker/SKILL.md: the project skill version 0.0.1 is older`);
+    expect(r.stdout).toContain(`warning: .claude/skills/pikaban/SKILL.md: the project skill version 0.0.1 is older`);
     expect(r.stdout).toContain(`warning: ${userSkill()}: the user skill version 0.0.2 is older`);
     expect(r.stdout).toContain("OK: 0 error(s), 2 warning(s)");
     expect(sb.json(["check"]).issues).toMatchObject([

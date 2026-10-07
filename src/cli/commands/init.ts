@@ -16,8 +16,8 @@ import {
   prepareInit,
   projectPaths,
   readGlobalConfig,
-  TRACKER_DIR,
-  TrackerError,
+  PIKABAN_DIR,
+  PikabanError,
   type GitRepo,
   type OptionalCategory,
   type ProjectConfig,
@@ -44,7 +44,7 @@ import { contextOf, type Context } from "../context.js";
 import { askChoice, askYesNo, isInteractive, withTerminal, type Ask } from "../prompt.js";
 import { describePermissionResult, describeSkillResult, skillConflictError } from "./skill.js";
 
-/** Options of `tracker init`. */
+/** Options of `pikaban init`. */
 export interface InitCommandOptions {
   name?: string;
   id?: string;
@@ -56,7 +56,7 @@ export interface InitCommandOptions {
   backlog?: boolean;
   /** `--review` / `--no-review`. Undefined if neither is given. */
   review?: boolean;
-  /** `--git` (keep the tracker files in git) / `--no-git` (add them to .git/info/exclude). */
+  /** `--git` (keep the pikaban files in git) / `--no-git` (add them to .git/info/exclude). */
   git?: boolean;
   /** `--yes`: the default for each question without a flag, and no confirmation. */
   yes?: boolean;
@@ -68,7 +68,7 @@ export interface InitAnswers {
   categories: OptionalCategory[];
   skill: SkillChoice;
   allow: boolean;
-  /** True: keep the tracker files in git. False: add them to .git/info/exclude. Null: not in a git repository. */
+  /** True: keep the pikaban files in git. False: add them to .git/info/exclude. Null: not in a git repository. */
   git: boolean | null;
 }
 
@@ -97,10 +97,10 @@ export interface InitRunResult {
   gitExcludes: string[];
 }
 
-export const SKILL_QUESTION = "Install the agent skill? project = <project>/.claude/skills/tracker, user = ~/.claude/skills/tracker";
-export const ALLOW_QUESTION = `Let the agent run tracker without permission prompts? Adds "${PERMISSION_RULE}" to .claude/settings.json`;
+export const SKILL_QUESTION = "Install the agent skill? project = <project>/.claude/skills/pikaban, user = ~/.claude/skills/pikaban";
+export const ALLOW_QUESTION = `Let the agent run pikaban without permission prompts? Adds "${PERMISSION_RULE}" to .claude/settings.json`;
 export const CATEGORIES_QUESTION = "Optional categories (todo, in_progress and done are always on):";
-export const GIT_QUESTION = "Keep the tracker files in git? no = add them to .git/info/exclude";
+export const GIT_QUESTION = "Keep the pikaban files in git? no = add them to .git/info/exclude";
 export const CONFIRM_QUESTION = "Write these changes?";
 
 /** The list of the optional categories and the question. Empty gives the default. */
@@ -118,7 +118,7 @@ async function askCategories(ask: Ask, def: readonly OptionalCategory[]): Promis
     const picked = parseCategoryList(a);
     if (picked !== null) return picked;
   }
-  throw new TrackerError(EXIT_USAGE, `no valid answer. Use ${OPTIONAL_CATEGORIES.join(", ")} (separated by commas) or none.`);
+  throw new PikabanError(EXIT_USAGE, `no valid answer. Use ${OPTIONAL_CATEGORIES.join(", ")} (separated by commas) or none.`);
 }
 
 /** `backlog,review`, `b r` and the like, in board order. Null for an unknown name. */
@@ -147,7 +147,7 @@ export async function resolveInitAnswers(
   io: { interactive: boolean; ask?: Ask; gitRepo?: boolean },
 ): Promise<InitAnswers> {
   if (opts.skill !== undefined && !(SKILL_CHOICES as readonly string[]).includes(opts.skill)) {
-    throw new TrackerError(EXIT_USAGE, `invalid --skill "${opts.skill}". Use ${SKILL_CHOICES.join(", ")}.`);
+    throw new PikabanError(EXIT_USAGE, `invalid --skill "${opts.skill}". Use ${SKILL_CHOICES.join(", ")}.`);
   }
   let skill = opts.skill as SkillChoice | undefined;
   let allow = opts.allow;
@@ -172,9 +172,9 @@ export async function resolveInitAnswers(
     const missing: string[] = [];
     if (skill === undefined) missing.push("--skill <project|user|none>");
     if (allow === undefined) missing.push("--allow or --no-allow");
-    throw new TrackerError(
+    throw new PikabanError(
       EXIT_USAGE,
-      `missing answers: ${missing.join(", ")}. Without a terminal, tracker init does not ask questions. ` +
+      `missing answers: ${missing.join(", ")}. Without a terminal, pikaban init does not ask questions. ` +
         "Give the flags, or --yes for the defaults (--skill project, --no-allow). Nothing was written.",
     );
   }
@@ -239,15 +239,15 @@ async function initSequence(
   const skillText = skillScope ? packagedSkill() : "";
   const skillPlan = skillScope ? planSkillInstall(skillFile(skillBase), skillText) : null;
   if (skillPlan?.status === "conflict") {
-    throw skillConflictError(skillPlan, `${skillInstallCommand(skillScope!, { force: true, root })}\nOr run tracker init with --skill none.`);
+    throw skillConflictError(skillPlan, `${skillInstallCommand(skillScope!, { force: true, root })}\nOr run pikaban init with --skill none.`);
   }
   // The permission rule always goes into <project>/.claude/settings.json.
   const settings = settingsFile(root);
   const rulePresent = answers.allow ? hasPermissionRule(readSettings(settings)) : false; // code 7
-  // "no" to git: .tracker/ and the project skill folder go into .git/info/exclude.
+  // "no" to git: .pikaban/ and the project skill folder go into .git/info/exclude.
   const excludes =
     repo && answers.git === false
-      ? [paths.trackerDir, ...(skillScope === "project" ? [dirname(skillFile(root))] : [])].map((p) => excludePattern(repo, p))
+      ? [paths.pikabanDir, ...(skillScope === "project" ? [dirname(skillFile(root))] : [])].map((p) => excludePattern(repo, p))
       : [];
 
   // 4. Summary and confirmation.
@@ -256,12 +256,12 @@ async function initSequence(
     return rel === "" || rel.startsWith("..") || isAbsolute(rel) ? file : rel;
   };
   if (!ctx.json) {
-    const lines = [`tracker init will make these changes in ${root}:`];
+    const lines = [`pikaban init will make these changes in ${root}:`];
     lines.push(
-      `  - make ${TRACKER_DIR}/ with config.json (project_id: ${config.project_id}, project_name: ${config.project_name}) and tasks/`,
+      `  - make ${PIKABAN_DIR}/ with config.json (project_id: ${config.project_id}, project_name: ${config.project_name}) and tasks/`,
       `  - categories: ${config.categories.join(", ")}`,
     );
-    lines.push(listed ? "  - the project is already in the global config" : `  - add the project to ${ctx.homeDir}/.tracker_config.json`);
+    lines.push(listed ? "  - the project is already in the global config" : `  - add the project to ${ctx.homeDir}/.pikaban_config.json`);
     if (!skillPlan) lines.push("  - no agent skill (--skill none)");
     else if (skillPlan.status === "unchanged") lines.push(`  - the ${skillScope} skill is already current: ${show(skillPlan.file)}`);
     else if (skillPlan.status === "updated") {
@@ -271,12 +271,12 @@ async function initSequence(
     else if (rulePresent) lines.push(`  - the permission rule "${PERMISSION_RULE}" is already in ${show(settings)}`);
     else lines.push(`  - add the permission rule "${PERMISSION_RULE}" to ${show(settings)}`);
     if (!repo) lines.push("  - not in a git repository: no git changes");
-    else if (answers.git) lines.push("  - keep the tracker files in git (git is not run: commit them yourself)");
+    else if (answers.git) lines.push("  - keep the pikaban files in git (git is not run: commit them yourself)");
     else lines.push(`  - add ${excludes.join(", ")} to ${show(repo.excludeFile)}`);
     process.stdout.write(`${lines.join("\n")}\n`);
   }
   if (interactive && ask && !opts.yes && !(await askYesNo(ask, CONFIRM_QUESTION, false))) {
-    throw new TrackerError(EXIT_GENERAL, "cancelled. Nothing was written.");
+    throw new PikabanError(EXIT_GENERAL, "cancelled. Nothing was written.");
   }
 
   // 5-7. The writes.
@@ -288,15 +288,15 @@ async function initSequence(
   } = { registered: false, skill: null, permission: null, gitExcludes: [] };
   const steps: Step[] = [
     {
-      done: `made ${paths.trackerDir}`,
-      fix: `the ${TRACKER_DIR}/ folder is not complete. Remove ${paths.trackerDir}, then run tracker init again`,
+      done: `made ${paths.pikabanDir}`,
+      fix: `the ${PIKABAN_DIR}/ folder is not complete. Remove ${paths.pikabanDir}, then run pikaban init again`,
       run: () => {
         initProject(root, config);
       },
     },
     {
       done: "added the project to the global config",
-      fix: `tracker projects add ${JSON.stringify(root)}`,
+      fix: `pikaban projects add ${JSON.stringify(root)}`,
       run: () => {
         done.registered = addProject(root, ctx.homeDir);
       },
@@ -337,7 +337,7 @@ async function initSequence(
       step.run();
     } catch (err) {
       // Nothing was written yet: the original error.
-      if (i === 0 && !existsSync(paths.trackerDir)) throw err;
+      if (i === 0 && !existsSync(paths.pikabanDir)) throw err;
       throw partialError(err, steps.slice(0, i), steps.slice(i));
     }
   }
@@ -354,7 +354,7 @@ async function initSequence(
   };
   ctx.out.result(result, () => {
     const lines = [
-      `Initialized ${paths.trackerDir}`,
+      `Initialized ${paths.pikabanDir}`,
       `project_id: ${config.project_id}, project_name: ${config.project_name}`,
       `categories: ${config.categories.join(", ")}`,
       registered ? "Added the project to the global config." : "The project is already in the global config.",
@@ -365,30 +365,30 @@ async function initSequence(
       lines.push(
         gitExcludes.length > 0
           ? `Added ${gitExcludes.join(", ")} to ${show(repo.excludeFile)}.`
-          : `The tracker files are already in ${show(repo.excludeFile)}.`,
+          : `The pikaban files are already in ${show(repo.excludeFile)}.`,
       );
     }
-    lines.push('Next: tracker add "<title>"');
+    lines.push('Next: pikaban add "<title>"');
     return lines.join("\n");
   });
   return result;
 }
 
-/** A step after the start failed. `.tracker/` stays. The message tells what is done and what to run. */
-function partialError(err: unknown, done: Step[], notDone: Step[]): TrackerError {
+/** A step after the start failed. `.pikaban/` stays. The message tells what is done and what to run. */
+function partialError(err: unknown, done: Step[], notDone: Step[]): PikabanError {
   const message = err instanceof Error ? err.message : String(err);
   const fixes = notDone.map((s) => s.fix).filter((f) => f !== "");
-  const lines = [`tracker init stopped: ${message}`];
+  const lines = [`pikaban init stopped: ${message}`];
   if (done.length > 0) lines.push(`Done: ${done.map((s) => s.done).join(", ")}.`);
   lines.push("Not done. Correct the problem, then run:", ...fixes.map((f) => `  ${f}`));
-  return new TrackerError(err instanceof TrackerError ? err.code : EXIT_GENERAL, lines.join("\n"), { cause: err });
+  return new PikabanError(err instanceof PikabanError ? err.code : EXIT_GENERAL, lines.join("\n"), { cause: err });
 }
 
 export function register(program: Command): void {
   program
     .command("init")
     .description(
-      "make .tracker/ and config.json in the project folder (-C or the current folder), install the skill " +
+      "make .pikaban/ and config.json in the project folder (-C or the current folder), install the skill " +
         "and the permission rule. Without a terminal, give --skill and --allow/--no-allow, or --yes " +
         "(the categories and git questions use their defaults)",
     )
@@ -403,8 +403,8 @@ export function register(program: Command): void {
     .option("--no-backlog", "no backlog category")
     .option("--review", "add the review category: the agent's finished tasks wait for your check")
     .option("--no-review", "no review category (default)")
-    .option("--git", "keep the tracker files in git (default; git is not run)")
-    .option("--no-git", "add .tracker/ (and the project skill) to .git/info/exclude")
+    .option("--git", "keep the pikaban files in git (default; git is not run)")
+    .option("--no-git", "add .pikaban/ (and the project skill) to .git/info/exclude")
     .option(
       "--yes",
       "use the default for each question without a flag (--backlog, --no-review, --skill project, --no-allow, --git); no confirmation",

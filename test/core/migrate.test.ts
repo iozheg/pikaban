@@ -3,10 +3,10 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EXIT_GENERAL, EXIT_SCHEMA_VERSION } from "../../src/core/errors.js";
 import { migrate } from "../../src/core/migrate.js";
-import { CONFIG, makeProject, removeDir, tempDir, trackerError } from "../helpers.js";
+import { CONFIG, makeProject, removeDir, tempDir, pikabanError } from "../helpers.js";
 
 let root: string;
-const configText = () => readFileSync(join(root, ".tracker", "config.json"), "utf8");
+const configText = () => readFileSync(join(root, ".pikaban", "config.json"), "utf8");
 
 beforeEach(() => {
   root = tempDir("migrate");
@@ -28,12 +28,12 @@ describe("migrate", () => {
   it("gives code 1 for an older version (no migrations exist) and writes nothing", () => {
     makeProject(root, { ...CONFIG, schema_version: 0 });
     const before = configText();
-    trackerError(EXIT_GENERAL, () => migrate(root));
+    pikabanError(EXIT_GENERAL, () => migrate(root));
     expect(configText()).toBe(before);
   });
 
   it("gives code 6 for a higher version", () => {
     makeProject(root, { ...CONFIG, schema_version: 2 });
-    trackerError(EXIT_SCHEMA_VERSION, () => migrate(root));
+    pikabanError(EXIT_SCHEMA_VERSION, () => migrate(root));
   });
 });

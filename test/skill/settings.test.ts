@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EXIT_VALIDATION } from "../../src/core/errors.js";
 import { addPermissionRule, PERMISSION_RULE, readSettings } from "../../src/skill/settings.js";
-import { removeDir, tempDir, trackerError } from "../helpers.js";
+import { removeDir, tempDir, pikabanError } from "../helpers.js";
 
 let base: string;
 let file: string;
@@ -50,7 +50,7 @@ describe("addPermissionRule", () => {
     write('{\n    "model": "opus"\n}\n');
     addPermissionRule(file);
     expect(readFileSync(file, "utf8")).toBe(
-      '{\n    "model": "opus",\n    "permissions": {\n        "allow": [\n            "Bash(tracker:*)"\n        ]\n    }\n}\n',
+      '{\n    "model": "opus",\n    "permissions": {\n        "allow": [\n            "Bash(pikaban:*)"\n        ]\n    }\n}\n',
     );
     write('{"permissions": {"deny": []}}');
     addPermissionRule(file);
@@ -71,10 +71,10 @@ describe("addPermissionRule", () => {
     ["an empty file", ""],
     ["an array", "[]"],
     ["permissions not an object", '{"permissions": true}'],
-    ["allow not an array", '{"permissions": {"allow": "Bash(tracker:*)"}}'],
+    ["allow not an array", '{"permissions": {"allow": "Bash(pikaban:*)"}}'],
   ])("%s: code 7, the file is not changed, no backup", (_name, text) => {
     write(text);
-    const err = trackerError(EXIT_VALIDATION, () => addPermissionRule(file));
+    const err = pikabanError(EXIT_VALIDATION, () => addPermissionRule(file));
     expect(err.message).toContain(file);
     expect(readFileSync(file, "utf8")).toBe(text);
     expect(existsSync(`${file}.bak`)).toBe(false);

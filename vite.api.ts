@@ -16,13 +16,13 @@ const serverDirs = ["src/core/", "src/server/"].map((d) => fileURLToPath(new URL
  * (one command, no build). Vite sends `/api/...` to it. A change in src/core/ or src/server/
  * restarts it; the board reconnects by itself.
  */
-export function trackerApi(): Plugin {
+export function pikabanApi(): Plugin {
   return {
-    name: "tracker-api",
+    name: "pikaban-api",
     apply: "serve",
     configureServer(vite) {
-      // The same folder as the CLI (design: TRACKER_HOME or the home folder).
-      const homeDir = process.env.TRACKER_HOME ? resolve(process.env.TRACKER_HOME) : homedir();
+      // The same folder as the CLI (design: PIKABAN_HOME or the home folder).
+      const homeDir = process.env.PIKABAN_HOME ? resolve(process.env.PIKABAN_HOME) : homedir();
       const log = vite.config.logger;
       let api: Promise<RunningServer> | undefined;
 
@@ -34,12 +34,12 @@ export function trackerApi(): Plugin {
               homeDir,
               port: 0,
               dev: true,
-              onError: (err) => log.error(`[tracker-api] ${String(err)}`),
+              onError: (err) => log.error(`[pikaban-api] ${String(err)}`),
             }),
           );
         api.then(
-          (s) => log.info(`[tracker-api] ${s.url} (data: ${homeDir})`, { timestamp: true }),
-          (err) => log.error(`[tracker-api] cannot start: ${(err as Error).stack ?? err}`),
+          (s) => log.info(`[pikaban-api] ${s.url} (data: ${homeDir})`, { timestamp: true }),
+          (err) => log.error(`[pikaban-api] cannot start: ${(err as Error).stack ?? err}`),
         );
       };
       const stop = async () => {
@@ -53,7 +53,7 @@ export function trackerApi(): Plugin {
         if (!serverDirs.some((d) => file.startsWith(d))) return;
         clearTimeout(timer);
         timer = setTimeout(async () => {
-          log.info(`[tracker-api] restart (${file.slice(file.lastIndexOf(sep) + 1)})`, { timestamp: true });
+          log.info(`[pikaban-api] restart (${file.slice(file.lastIndexOf(sep) + 1)})`, { timestamp: true });
           await stop();
           vite.environments.ssr.moduleGraph.invalidateAll();
           start();

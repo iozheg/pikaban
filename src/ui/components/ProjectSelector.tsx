@@ -9,7 +9,7 @@ interface ProjectSelectorProps {
 }
 
 /**
- * The projects from ~/.tracker_config.json (design 7.1 item 1). Projects that are not available
+ * The projects from ~/.pikaban_config.json (design 7.1 item 1). Projects that are not available
  * (missing, different schema version, config not valid) show as disabled options with the reason.
  */
 export function ProjectSelector({ projects, selected, onSelect }: ProjectSelectorProps) {

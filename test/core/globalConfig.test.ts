@@ -9,7 +9,7 @@ import {
   readGlobalConfig,
   removeProject,
 } from "../../src/core/globalConfig.js";
-import { removeDir, tempDir, trackerError } from "../helpers.js";
+import { removeDir, tempDir, pikabanError } from "../helpers.js";
 
 let home: string;
 
@@ -22,8 +22,8 @@ afterEach(() => {
 });
 
 describe("global config", () => {
-  it("uses ~/.tracker_config.json in the given home folder", () => {
-    expect(globalConfigPath(home)).toBe(join(home, ".tracker_config.json"));
+  it("uses ~/.pikaban_config.json in the given home folder", () => {
+    expect(globalConfigPath(home)).toBe(join(home, ".pikaban_config.json"));
   });
 
   it("gives an empty list when the file does not exist", () => {
@@ -38,7 +38,7 @@ describe("global config", () => {
     expect(addProject("relative/c", home)).toBe(true);
     expect(listProjects(home)[2]).toBe(join(process.cwd(), "relative/c"));
     expect(readFileSync(globalConfigPath(home), "utf8")).toMatch(/^\{\n {2}"projects": \[[\s\S]*\]\n\}\n$/);
-    expect(readdirSync(home)).toEqual([".tracker_config.json"]);
+    expect(readdirSync(home)).toEqual([".pikaban_config.json"]);
   });
 
   it("removes a path", () => {
@@ -57,9 +57,9 @@ describe("global config", () => {
 
   it("gives code 7 for invalid JSON or a relative path in the file, and does not write", () => {
     writeFileSync(globalConfigPath(home), "{ bad");
-    trackerError(EXIT_VALIDATION, () => addProject("/projects/a", home));
+    pikabanError(EXIT_VALIDATION, () => addProject("/projects/a", home));
     expect(readFileSync(globalConfigPath(home), "utf8")).toBe("{ bad");
     writeFileSync(globalConfigPath(home), JSON.stringify({ projects: ["rel"] }));
-    trackerError(EXIT_VALIDATION, () => listProjects(home));
+    pikabanError(EXIT_VALIDATION, () => listProjects(home));
   });
 });

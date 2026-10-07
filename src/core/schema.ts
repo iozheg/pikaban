@@ -1,6 +1,6 @@
 import { isAbsolute } from "node:path";
 import { z } from "zod";
-import { EXIT_VALIDATION, TrackerError } from "./errors.js";
+import { EXIT_VALIDATION, PikabanError } from "./errors.js";
 
 export const SCHEMA_VERSION = 1;
 
@@ -94,7 +94,7 @@ export function taskFrontmatterSchemaFor(categories: readonly string[]) {
   });
 }
 
-/** Parses `data` with `schema`. On failure, throws TrackerError code 7. */
+/** Parses `data` with `schema`. On failure, throws PikabanError code 7. */
 export function validate<T extends z.ZodType>(
   schema: T,
   data: unknown,
@@ -107,7 +107,7 @@ export function validate<T extends z.ZodType>(
     const missing = valueAt(data, i.path) === undefined;
     return `  ${i.path.join(".")}: ${missing ? "required field is missing" : i.message}`;
   });
-  throw new TrackerError(EXIT_VALIDATION, `${source}: validation failed\n${lines.join("\n")}`);
+  throw new PikabanError(EXIT_VALIDATION, `${source}: validation failed\n${lines.join("\n")}`);
 }
 
 function valueAt(data: unknown, path: readonly PropertyKey[]): unknown {

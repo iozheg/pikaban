@@ -1,5 +1,5 @@
 // Pure UI logic (no DOM, no fetch), so that vitest can test it in Node.js.
-import type { Assignee, InvalidFile, ProjectSummary, Task, TaskPatch, TrackerEvent } from "./types.js";
+import type { Assignee, InvalidFile, ProjectSummary, Task, TaskPatch, PikabanEvent } from "./types.js";
 
 /** The short message after HTTP 412 on the board (plan step 11). */
 export const CONFLICT_MESSAGE = "This task changed on disk. Reloaded.";
@@ -13,7 +13,7 @@ export class ApiError extends Error {
     /** The HTTP status. 0 if the server did not answer. */
     readonly status: number,
     message: string,
-    /** The tracker exit code from the error body, if there is one. */
+    /** The pikaban exit code from the error body, if there is one. */
     readonly code: number | null = null,
     /** Only for 412: the task on disk now, or null if the file is gone. */
     readonly current?: Task | null,
@@ -144,7 +144,7 @@ export type EventPlan =
   | { kind: "none" };
 
 /** What to load again for an SSE event. `pid` is the selected project. */
-export function planEvent(e: TrackerEvent, pid: string | null): EventPlan {
+export function planEvent(e: PikabanEvent, pid: string | null): EventPlan {
   if (e.type === "projects") return { kind: "projects" };
   if (pid === null || e.pid !== pid) return { kind: "none" };
   if (e.type === "config") return { kind: "project" };

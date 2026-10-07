@@ -1,5 +1,5 @@
 import { Document, Scalar, isMap, parseDocument } from "yaml";
-import { EXIT_VALIDATION, TrackerError } from "./errors.js";
+import { EXIT_VALIDATION, PikabanError } from "./errors.js";
 import {
   TASK_FIELDS,
   TaskFrontmatterSchema,
@@ -30,12 +30,12 @@ const CLOSE_RE = /^---[ \t]*(?:\r?\n|$)/m;
 export function splitFrontmatter(text: string, source = "task file"): { yaml: string; body: string } {
   const open = OPEN_RE.exec(text);
   if (!open) {
-    throw new TrackerError(EXIT_VALIDATION, `${source}: the file must start with a "---" line`);
+    throw new PikabanError(EXIT_VALIDATION, `${source}: the file must start with a "---" line`);
   }
   const rest = text.slice(open[0].length);
   const close = CLOSE_RE.exec(rest);
   if (!close) {
-    throw new TrackerError(EXIT_VALIDATION, `${source}: no closing "---" line after the frontmatter`);
+    throw new PikabanError(EXIT_VALIDATION, `${source}: no closing "---" line after the frontmatter`);
   }
   return { yaml: rest.slice(0, close.index), body: rest.slice(close.index + close[0].length) };
 }
@@ -48,12 +48,12 @@ export function parseTaskFile(text: string, opts: FrontmatterOptions = {}): Task
   const doc = parseDocument(`\n${yaml}`, YAML_OPTIONS);
   if (doc.errors.length > 0) {
     const e = doc.errors[0]!;
-    throw new TrackerError(EXIT_VALIDATION, `${source}: invalid YAML in frontmatter: ${e.message.trimEnd()}`, {
+    throw new PikabanError(EXIT_VALIDATION, `${source}: invalid YAML in frontmatter: ${e.message.trimEnd()}`, {
       cause: e,
     });
   }
   if (!isMap(doc.contents)) {
-    throw new TrackerError(EXIT_VALIDATION, `${source}: the frontmatter must be a YAML mapping`);
+    throw new PikabanError(EXIT_VALIDATION, `${source}: the frontmatter must be a YAML mapping`);
   }
 
   const schema = opts.categories ? taskFrontmatterSchemaFor(opts.categories) : TaskFrontmatterSchema;

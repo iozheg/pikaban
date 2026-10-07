@@ -62,7 +62,7 @@ export interface TaskPatch {
 }
 
 /** The data of one SSE message from `GET /api/events` (design 7.3). */
-export interface TrackerEvent {
+export interface PikabanEvent {
   type: "changed" | "removed" | "config" | "projects";
   pid?: string;
   id?: string;

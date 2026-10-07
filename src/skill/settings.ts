@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { atomicWrite, EXIT_VALIDATION, TrackerError } from "../core/index.js";
+import { atomicWrite, EXIT_VALIDATION, PikabanError } from "../core/index.js";
 
-/** The Claude Code permission rule that lets the agent run `tracker` without prompts. */
-export const PERMISSION_RULE = "Bash(tracker:*)";
+/** The Claude Code permission rule that lets the agent run `pikaban` without prompts. */
+export const PERMISSION_RULE = "Bash(pikaban:*)";
 
 type JsonObject = Record<string, unknown>;
 
@@ -18,8 +18,8 @@ function isObject(v: unknown): v is JsonObject {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function invalid(file: string, why: string, cause?: unknown): TrackerError {
-  return new TrackerError(EXIT_VALIDATION, `${file}: ${why}. The file was not changed.`, { cause });
+function invalid(file: string, why: string, cause?: unknown): PikabanError {
+  return new PikabanError(EXIT_VALIDATION, `${file}: ${why}. The file was not changed.`, { cause });
 }
 
 /**
@@ -71,7 +71,7 @@ function indentOf(text: string | null): string {
 }
 
 /**
- * Adds `Bash(tracker:*)` to `permissions.allow` in `file` (plan step 8). `file` is a
+ * Adds `Bash(pikaban:*)` to `permissions.allow` in `file` (plan step 8). `file` is a
  * `settings.json` or a `settings.local.json`.
  * - A missing file is `{}`. The folder is made if necessary.
  * - Invalid JSON: code 7, nothing is written.

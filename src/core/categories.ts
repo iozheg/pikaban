@@ -1,4 +1,4 @@
-import { EXIT_GENERAL, EXIT_USAGE, TrackerError } from "./errors.js";
+import { EXIT_GENERAL, EXIT_USAGE, PikabanError } from "./errors.js";
 import { atomicWrite } from "./fs.js";
 import { assertWritable, type Project } from "./project.js";
 import { ProjectConfigSchema, REQUIRED_CATEGORIES, validate, type ProjectConfig } from "./schema.js";
@@ -7,7 +7,7 @@ import { list } from "./tasks.js";
 /** All categories that the CLI can turn on, in board order. */
 export const KNOWN_CATEGORIES = ["backlog", "todo", "in_progress", "review", "done"] as const;
 
-/** The categories that `init` asks about and `tracker categories` can turn on and off. */
+/** The categories that `init` asks about and `pikaban categories` can turn on and off. */
 export const OPTIONAL_CATEGORIES = ["backlog", "review"] as const;
 export type OptionalCategory = (typeof OPTIONAL_CATEGORIES)[number];
 
@@ -42,9 +42,9 @@ export interface CategoryChange {
 export function parseOptionalCategory(name: string): OptionalCategory {
   if (isOptionalCategory(name)) return name;
   if ((REQUIRED_CATEGORIES as readonly string[]).includes(name)) {
-    throw new TrackerError(EXIT_USAGE, `"${name}" is required and is always on.`);
+    throw new PikabanError(EXIT_USAGE, `"${name}" is required and is always on.`);
   }
-  throw new TrackerError(EXIT_USAGE, `unknown category "${name}". Use ${OPTIONAL_CATEGORIES.join(" or ")}.`);
+  throw new PikabanError(EXIT_USAGE, `unknown category "${name}". Use ${OPTIONAL_CATEGORIES.join(" or ")}.`);
 }
 
 /**
@@ -65,10 +65,10 @@ export function setCategoryEnabled(p: Project, category: OptionalCategory, enabl
   } else {
     const left = list(p, { category }).tasks;
     if (left.length > 0) {
-      throw new TrackerError(
+      throw new PikabanError(
         EXIT_GENERAL,
         `${left.length} task(s) are in ${category}: ${left.map((t) => t.short).join(", ")}. ` +
-          `Move them to another category first (tracker move <ref> <category>).`,
+          `Move them to another category first (pikaban move <ref> <category>).`,
       );
     }
     categories = current.filter((c) => c !== category);

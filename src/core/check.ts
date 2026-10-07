@@ -48,7 +48,7 @@ export function check(p: Project, opts: CheckOptions = {}): CheckReport {
       kind: "schema_version",
       severity: "error",
       file: p.configFile,
-      message: `schema version ${v} is different from the CLI (version ${SCHEMA_VERSION}). Run "tracker migrate".`,
+      message: `schema version ${v} is different from the CLI (version ${SCHEMA_VERSION}). Run "pikaban migrate".`,
     });
   }
 

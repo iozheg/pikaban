@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { EXIT_CONFLICT, TrackerError } from "../../core/index.js";
+import { EXIT_CONFLICT, PikabanError } from "../../core/index.js";
 import {
   installSkill,
   packagedSkill,
@@ -45,8 +45,8 @@ export function describePermissionResult(r: PermissionResult, show: (file: strin
 }
 
 /** The code 5 error for a skill file with local changes. The message contains the diff. */
-export function skillConflictError(r: SkillInstallResult, fix: string): TrackerError {
-  return new TrackerError(
+export function skillConflictError(r: SkillInstallResult, fix: string): PikabanError {
+  return new PikabanError(
     EXIT_CONFLICT,
     `${r.file} is different from the skill text of this CLI. Nothing was written.\n` +
       `${r.diff ?? ""}To replace the file, run: ${fix}`,
@@ -59,10 +59,10 @@ export function register(program: Command): void {
   skill
     .command("install")
     .description(
-      "install the skill into ~/.claude/skills/tracker/ (or the project with --project). " +
+      "install the skill into ~/.claude/skills/pikaban/ (or the project with --project). " +
         "A changed skill file gives exit code 5 and a diff, unless --force",
     )
-    .option("--project", "install into <project>/.claude/skills/tracker/ (the project found from -C or the current folder)")
+    .option("--project", "install into <project>/.claude/skills/pikaban/ (the project found from -C or the current folder)")
     .option("--force", "replace a skill file that has local changes")
     .option(
       "--allow",

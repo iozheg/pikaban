@@ -1,7 +1,7 @@
 // Fetch wrapper for the UI server API (design 7.2) and the SSE client (design 7.3).
 // Each task carries its `etag`. Writes send it in `If-Match`.
 import { ApiError, apiErrorFrom } from "./logic.js";
-import type { ProjectSummary, Task, TaskList, TaskPatch, TrackerEvent } from "./types.js";
+import type { ProjectSummary, Task, TaskList, TaskPatch, PikabanEvent } from "./types.js";
 
 interface CallOptions {
   body?: unknown;
@@ -21,7 +21,7 @@ async function call<T>(method: string, path: string, opts: CallOptions = {}): Pr
       cache: "no-store",
     });
   } catch {
-    throw new ApiError(0, "The UI server does not answer. Make sure that `tracker ui` runs.");
+    throw new ApiError(0, "The UI server does not answer. Make sure that `pikaban ui` runs.");
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
@@ -51,7 +51,7 @@ export const api = {
 };
 
 export interface EventHandlers {
-  onEvent(e: TrackerEvent): void;
+  onEvent(e: PikabanEvent): void;
   /** After each connection and each reconnection. Load everything again: events can be lost. */
   onOpen(): void;
   /** The connection stopped. The client connects again. */
@@ -68,9 +68,9 @@ export function connectEvents(h: EventHandlers): () => void {
     es = new EventSource("/api/events");
     es.onopen = () => h.onOpen();
     es.onmessage = (m: MessageEvent<string>) => {
-      let e: TrackerEvent;
+      let e: PikabanEvent;
       try {
-        e = JSON.parse(m.data) as TrackerEvent;
+        e = JSON.parse(m.data) as PikabanEvent;
       } catch {
         return;
       }

@@ -1,5 +1,5 @@
 import { CommanderError } from "commander";
-import { EXIT_GENERAL, EXIT_USAGE, TrackerError, type Task } from "../core/index.js";
+import { EXIT_GENERAL, EXIT_USAGE, PikabanError, type Task } from "../core/index.js";
 
 /**
  * Output for one command run.
@@ -37,9 +37,9 @@ export class Output {
   }
 }
 
-/** Exit code and message: TrackerError gives its code, commander usage errors 2, other errors 1. */
+/** Exit code and message: PikabanError gives its code, commander usage errors 2, other errors 1. */
 function describeError(err: unknown): { code: number; message: string; printed: boolean } {
-  if (err instanceof TrackerError) return { code: err.code, message: err.message, printed: false };
+  if (err instanceof PikabanError) return { code: err.code, message: err.message, printed: false };
   if (err instanceof CommanderError) {
     // Help and version give exit code 0. Commander already wrote its own text in human mode.
     const code = err.exitCode === 0 ? 0 : EXIT_USAGE;

@@ -6,7 +6,7 @@ import {
   listProjects,
   openProject,
   SCHEMA_VERSION,
-  TrackerError,
+  PikabanError,
   type Project,
   type ProjectConfig,
 } from "../core/index.js";
@@ -56,16 +56,16 @@ export function describeProject(root: string): ProjectSummary {
     if (p.config.schema_version !== SCHEMA_VERSION) {
       summary.status = "schema_mismatch";
       summary.message =
-        `schema version ${p.config.schema_version} is older than this tracker (version ${SCHEMA_VERSION}). ` +
-        `Run "tracker migrate" in the project.`;
+        `schema version ${p.config.schema_version} is older than this pikaban (version ${SCHEMA_VERSION}). ` +
+        `Run "pikaban migrate" in the project.`;
       summary.config = null;
     }
     return summary;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     let status: ProjectStatus = "invalid";
-    if (err instanceof TrackerError && err.code === EXIT_NOT_FOUND) status = "missing";
-    if (err instanceof TrackerError && err.code === EXIT_SCHEMA_VERSION) status = "schema_mismatch";
+    if (err instanceof PikabanError && err.code === EXIT_NOT_FOUND) status = "missing";
+    if (err instanceof PikabanError && err.code === EXIT_SCHEMA_VERSION) status = "schema_mismatch";
     return { ...base, name: basename(base.root), project_id: null, schema_version: null, status, message, config: null };
   }
 }

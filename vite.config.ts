@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import preact from "@preact/preset-vite";
 import { defineConfig } from "vite";
-import { trackerApi } from "./vite.api.js";
+import { pikabanApi } from "./vite.api.js";
 
 const root = fileURLToPath(new URL("src/ui/", import.meta.url));
 const outDir = fileURLToPath(new URL("dist/ui/", import.meta.url));
@@ -10,7 +10,7 @@ const outDir = fileURLToPath(new URL("dist/ui/", import.meta.url));
 export default defineConfig({
   root,
   base: "/",
-  plugins: [preact(), trackerApi()],
+  plugins: [preact(), pikabanApi()],
   build: {
     outDir,
     // outDir is outside `root`: Vite cleans it only with this option. It cleans only dist/ui/.

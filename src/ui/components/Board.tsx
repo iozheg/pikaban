@@ -4,7 +4,7 @@ import type { InvalidFile, Task } from "../types.js";
 import { Card, ErrorCard } from "./Card.js";
 
 /** The drag data type. Other drags (files, text) are not accepted. */
-const DRAG_TYPE = "application/x-tracker-task";
+const DRAG_TYPE = "application/x-pikaban-task";
 
 interface BoardProps {
   categories: string[];
@@ -43,7 +43,7 @@ export function Board({ categories, tasks, invalid, selectedId, onOpen, onMove }
             Task files that are not valid <span class="count">{invalid.length}</span>
           </h2>
           <p class="hint">
-            Correct these files by hand, or run <code>tracker check</code>. The other tasks operate normally.
+            Correct these files by hand, or run <code>pikaban check</code>. The other tasks operate normally.
           </p>
           <ul class="card-list invalid-list">
             {invalid.map((f) => (

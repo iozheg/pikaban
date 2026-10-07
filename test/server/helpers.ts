@@ -3,14 +3,14 @@ import { request as httpRequest, type IncomingHttpHeaders } from "node:http";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { addProject, initProject, prepareInit } from "../../src/core/index.js";
-import { pidOf, startServer, type RunningServer, type ServerOptions, type TrackerEvent } from "../../src/server/index.js";
+import { pidOf, startServer, type RunningServer, type ServerOptions, type PikabanEvent } from "../../src/server/index.js";
 import { removeDir, tempDir } from "../helpers.js";
 
 export interface Env {
   base: string;
-  /** TRACKER_HOME */
+  /** PIKABAN_HOME */
   home: string;
-  /** Makes `<base>/<name>` with `.tracker/` and adds it to the global config of `home`. */
+  /** Makes `<base>/<name>` with `.pikaban/` and adds it to the global config of `home`. */
   project(name: string): { root: string; pid: string };
   cleanup(): void;
 }
@@ -91,9 +91,9 @@ export function request(port: number, method: string, path: string, opts: Reques
 
 export interface SseClient {
   /** The events received so far. */
-  events: TrackerEvent[];
+  events: PikabanEvent[];
   /** Waits for an event that matches. Rejects after `timeoutMs`. */
-  waitFor(match: (e: TrackerEvent) => boolean, timeoutMs?: number): Promise<TrackerEvent>;
+  waitFor(match: (e: PikabanEvent) => boolean, timeoutMs?: number): Promise<PikabanEvent>;
   close(): void;
 }
 
@@ -107,7 +107,7 @@ export function sse(port: number): Promise<SseClient> {
           reject(new Error(`SSE status ${res.statusCode}`));
           return;
         }
-        const events: TrackerEvent[] = [];
+        const events: PikabanEvent[] = [];
         const waiters = new Set<() => void>();
         let buffer = "";
         res.setEncoding("utf8");
@@ -188,7 +188,7 @@ export function writeUi(dir: string, files: Record<string, string>): void {
  * the watcher is ready can be lost, and a change just before the start can be reported late.
  */
 export async function warmUp(client: SseClient, root: string): Promise<void> {
-  const file = join(root, ".tracker", "tasks", "zz-warm-up.md");
+  const file = join(root, ".pikaban", "tasks", "zz-warm-up.md");
   const deadline = Date.now() + 5000;
   for (;;) {
     writeFileSync(file, String(Date.now()));

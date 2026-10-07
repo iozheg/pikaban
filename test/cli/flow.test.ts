@@ -15,19 +15,19 @@ function init(): void {
 }
 
 describe("init", () => {
-  it("makes .tracker/ and config.json and adds the project to the global config", () => {
+  it("makes .pikaban/ and config.json and adds the project to the global config", () => {
     const r = sb.run(["init", "--skill", "none", "--no-allow"]);
     expect(r.code, r.stderr).toBe(0);
     expect(r.stdout).toContain("Initialized");
-    expect(existsSync(join(sb.dir, ".tracker", "tasks"))).toBe(true);
-    const config = JSON.parse(readFileSync(join(sb.dir, ".tracker", "config.json"), "utf8"));
+    expect(existsSync(join(sb.dir, ".pikaban", "tasks"))).toBe(true);
+    const config = JSON.parse(readFileSync(join(sb.dir, ".pikaban", "config.json"), "utf8"));
     expect(config).toEqual({
       schema_version: 1,
       project_id: "my-project",
       project_name: "My Project",
       categories: ["backlog", "todo", "in_progress", "done"],
     });
-    const global = JSON.parse(readFileSync(join(sb.home, ".tracker_config.json"), "utf8"));
+    const global = JSON.parse(readFileSync(join(sb.home, ".pikaban_config.json"), "utf8"));
     expect(global.projects).toEqual([sb.dir]);
   });
 
@@ -38,8 +38,8 @@ describe("init", () => {
     expect(out.project.config.project_name).toBe("Other");
     expect(out.project.config.project_id).toBe("other-id");
     expect(out.registered).toBe(true);
-    expect(existsSync(join(other, ".tracker", "config.json"))).toBe(true);
-    expect(existsSync(join(sb.dir, ".tracker"))).toBe(false);
+    expect(existsSync(join(other, ".pikaban", "config.json"))).toBe(true);
+    expect(existsSync(join(sb.dir, ".pikaban"))).toBe(false);
   });
 
   it("with --skill none --no-allow: does not run git and does not make other files", () => {
@@ -60,7 +60,7 @@ describe("full flow", () => {
     const second = sb.json(["add", "Second task", "--category", "todo"]);
     expect(second).toMatchObject({ short: "task-0002", title: "Second task", category: "todo", assignee: null });
     expect(second.etag).toMatch(/^[0-9a-f]{64}$/);
-    expect(second.file).toContain(join(".tracker", "tasks", "task-0002-"));
+    expect(second.file).toContain(join(".pikaban", "tasks", "task-0002-"));
 
     // list --json, global option before and after the command
     const listed = sb.json(["list"]);
@@ -154,7 +154,7 @@ describe("full flow", () => {
   it("list shows invalid files as warnings on stderr, and in --json output", () => {
     init();
     sb.run(["add", "Good"]);
-    writeFileSync(join(sb.dir, ".tracker", "tasks", "broken.md"), "no frontmatter\n");
+    writeFileSync(join(sb.dir, ".pikaban", "tasks", "broken.md"), "no frontmatter\n");
     const human = sb.run(["list"]);
     expect(human.code).toBe(0);
     expect(human.stdout).toContain("Good");
@@ -183,7 +183,7 @@ describe("check and migrate", () => {
     init();
     const t = sb.json(["add", "A"]);
     // A file name that does not agree with short and id is a warning.
-    renameSync(t.file, join(sb.dir, ".tracker", "tasks", "renamed.md"));
+    renameSync(t.file, join(sb.dir, ".pikaban", "tasks", "renamed.md"));
     const r = sb.run(["check", "--json"]);
     expect(r.code).toBe(0);
     expect(JSON.parse(r.stdout).issues).toMatchObject([{ kind: "file_name", severity: "warning" }]);
@@ -214,10 +214,10 @@ describe("projects", () => {
 });
 
 describe("help and version", () => {
-  it("--help documents TRACKER_HOME and gives 0", () => {
+  it("--help documents PIKABAN_HOME and gives 0", () => {
     const r = sb.run(["--help"]);
     expect(r.code).toBe(0);
-    expect(r.stdout).toContain("TRACKER_HOME");
+    expect(r.stdout).toContain("PIKABAN_HOME");
     expect(sb.run(["list", "--help"]).code).toBe(0);
     expect(sb.run(["--version"]).code).toBe(0);
   });
