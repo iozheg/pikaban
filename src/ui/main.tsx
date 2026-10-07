@@ -286,7 +286,6 @@ function App() {
           <>
             <AddTask
               pid={pid}
-              firstCategory={config.categories[0] ?? ""}
               onCreated={(t) => {
                 setTasks((ts) => upsertTask(ts, t));
                 notify(`Added ${t.short}.`);
