@@ -1,7 +1,6 @@
 import { render } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { api, connectEvents } from "./api.js";
-import { AddTask } from "./components/AddTask.js";
 import { Board } from "./components/Board.js";
 import { ProjectSelector } from "./components/ProjectSelector.js";
 import { TaskEditor } from "./components/TaskEditor.js";
@@ -21,7 +20,7 @@ import {
   sortTasks,
   upsertTask,
 } from "./logic.js";
-import { loadSelectedProject, saveSelectedProject } from "./storage.js";
+import { loadSelectedProject, loadTheme, saveSelectedProject, saveTheme, type Theme } from "./storage.js";
 import type { InvalidFile, ProjectSummary, Task, PikabanEvent } from "./types.js";
 import "./styles.css";
 
@@ -31,6 +30,39 @@ interface Toast {
 }
 
 type Live = "connecting" | "live" | "down";
+
+// Before the first render, so the board does not show the other theme first. Without a saved
+// choice there is no attribute: the CSS follows prefers-color-scheme.
+const savedTheme = loadTheme();
+if (savedTheme !== null) document.documentElement.dataset.theme = savedTheme;
+const darkQuery = globalThis.matchMedia?.("(prefers-color-scheme: dark)");
+
+/** The theme switch: Light / Dark. Shows the system theme until the user picks one. */
+function ThemeSwitch() {
+  const [saved, setSaved] = useState<Theme | null>(savedTheme);
+  const [systemDark, setSystemDark] = useState(darkQuery?.matches ?? false);
+  useEffect(() => {
+    if (!darkQuery) return;
+    const h = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    darkQuery.addEventListener("change", h);
+    return () => darkQuery.removeEventListener("change", h);
+  }, []);
+  const theme = saved ?? (systemDark ? "dark" : "light");
+  const pick = (t: Theme) => {
+    setSaved(t);
+    saveTheme(t);
+    document.documentElement.dataset.theme = t;
+  };
+  return (
+    <div class="segmented" role="group" aria-label="Theme">
+      {(["light", "dark"] as const).map((t) => (
+        <button key={t} type="button" aria-pressed={theme === t} class={theme === t ? "is-on" : ""} onClick={() => pick(t)}>
+          {t === "light" ? "Light" : "Dark"}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function App() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
@@ -42,6 +74,8 @@ function App() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [openInitial, setOpenInitial] = useState<Task | null>(null);
   const [live, setLive] = useState<Live>("connecting");
+  // "Waiting on developer": dims the other cards. Not saved.
+  const [waitingFilter, setWaitingFilter] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   // The SSE handlers and async loads read these refs, not stale state.
@@ -206,9 +240,27 @@ function App() {
     }
   }
 
-  function openTask(id: string) {
+  /** Makes a task from a column's "+ Add task" input and opens it. */
+  async function createTask(title: string, category: string): Promise<boolean> {
+    const p = pidRef.current;
+    if (p === null) return false;
+    try {
+      const t = await api.createTask(p, { title, category });
+      if (pidRef.current !== p) return true;
+      setTasks((ts) => upsertTask(ts, t));
+      notify(`Added ${t.short}.`);
+      openTask(t.id, t);
+      return true;
+    } catch (err) {
+      notify(`Cannot add the task: ${errorMessage(err)}`);
+      return false;
+    }
+  }
+
+  /** `known`: the task, if `tasks` in this render does not have it yet (just made). */
+  function openTask(id: string, known?: Task) {
     if (id === openId) return;
-    const t = tasks.find((x) => x.id === id);
+    const t = known ?? tasks.find((x) => x.id === id);
     if (!t || !confirmDiscard()) return;
     dirtyRef.current = false;
     setOpenInitial(t);
@@ -225,100 +277,109 @@ function App() {
   const summary = projects?.find((p) => p.pid === pid) ?? null;
   const config = summary?.status === "ok" ? summary.config : null;
   const openTaskNow = openId === null ? null : (tasks.find((t) => t.id === openId) ?? null);
+  const waitingCount = tasks.filter((t) => t.needs_input).length;
 
   useEffect(() => {
     document.title = summary ? `${summary.name} · Pikaban` : "Pikaban";
   }, [summary?.name]);
 
   return (
-    <div class={`app${openId !== null ? " editor-open" : ""}`}>
+    <div class="app">
       <header class="topbar">
         <h1 class="brand">Pikaban</h1>
         {projects && <ProjectSelector projects={projects} selected={pid} onSelect={chooseProject} />}
-        {summary && <span class="project-root" title={summary.root}>{summary.root}</span>}
+        <span class="spacer" />
         <span class={`live live-${live}`} title="Live updates from the files on disk">
           {live === "live" ? "Live" : live === "down" ? "Reconnecting…" : "Connecting…"}
         </span>
+        {config && (
+          <button
+            type="button"
+            class={`waiting-filter${waitingFilter ? " is-on" : ""}`}
+            aria-pressed={waitingFilter}
+            title="Dim the tasks that do not wait for the developer"
+            onClick={() => setWaitingFilter((f) => !f)}
+          >
+            <span class="waiting-count">{waitingCount}</span>
+            Waiting on developer
+          </button>
+        )}
+        <ThemeSwitch />
       </header>
 
-      <main class="content">
-        {projectsError && (
-          <div class="notice notice-error" role="alert">
-            <p>Cannot load the projects: {projectsError}</p>
-            <button type="button" onClick={() => void loadProjects()}>
-              Try again
-            </button>
-          </div>
-        )}
+      <div class="content">
+        <main class="main">
+          {projectsError && (
+            <div class="notice notice-error" role="alert">
+              <p>Cannot load the projects: {projectsError}</p>
+              <button type="button" onClick={() => void loadProjects()}>
+                Try again
+              </button>
+            </div>
+          )}
 
-        {projects && projects.length === 0 && (
-          <div class="empty">
-            <h2>No projects</h2>
-            <p>
-              Run <code>pikaban init</code> in a project folder, or <code>pikaban projects add &lt;path&gt;</code>.
-              The board shows the project at once.
-            </p>
-          </div>
-        )}
+          {projects && projects.length === 0 && (
+            <div class="empty">
+              <h2>No projects</h2>
+              <p>
+                Run <code>pikaban init</code> in a project folder, or <code>pikaban projects add &lt;path&gt;</code>.
+                The board shows the project at once.
+              </p>
+            </div>
+          )}
 
-        {projects && projects.length > 0 && pid === null && (
-          <div class="empty">
-            <h2>No available project</h2>
-            <p>All projects in the list are unavailable. Open “unavailable projects” above to see why.</p>
-          </div>
-        )}
+          {projects && projects.length > 0 && pid === null && (
+            <div class="empty">
+              <h2>No available project</h2>
+              <p>All projects in the list are unavailable. Open “unavailable projects” above to see why.</p>
+            </div>
+          )}
 
-        {summary && !isAvailable(summary) && (
-          <div class="notice notice-error" role="alert">
-            <p>
-              <strong>{summary.name}</strong> is not available: {summary.message ?? summary.status}
-            </p>
-          </div>
-        )}
+          {summary && !isAvailable(summary) && (
+            <div class="notice notice-error" role="alert">
+              <p>
+                <strong>{summary.name}</strong> is not available: {summary.message ?? summary.status}
+              </p>
+            </div>
+          )}
 
-        {tasksError && summary && isAvailable(summary) && (
-          <div class="notice notice-error" role="alert">
-            <p>Cannot load the tasks: {tasksError}</p>
-          </div>
-        )}
+          {tasksError && summary && isAvailable(summary) && (
+            <div class="notice notice-error" role="alert">
+              <p>Cannot load the tasks: {tasksError}</p>
+            </div>
+          )}
 
-        {pid !== null && config && summary && isAvailable(summary) && (
-          <>
-            <AddTask
-              pid={pid}
-              onCreated={(t) => {
-                setTasks((ts) => upsertTask(ts, t));
-                notify(`Added ${t.short}.`);
-              }}
-            />
+          {pid !== null && config && summary && isAvailable(summary) && (
             <Board
               categories={config.categories}
               tasks={tasks}
               invalid={invalid}
               selectedId={openId}
+              waitingFilter={waitingFilter}
               onOpen={openTask}
               onMove={(id, c) => void moveTask(id, c)}
+              onCreate={createTask}
             />
-          </>
-        )}
-      </main>
+          )}
+        </main>
 
-      {pid !== null && config && openId !== null && openInitial !== null && (
-        <TaskEditor
-          key={openId}
-          pid={pid}
-          task={openTaskNow}
-          initial={openInitial}
-          categories={config.categories}
-          onClose={closeEditor}
-          onTask={(t) => setTasks((ts) => upsertTask(ts, t))}
-          onGone={(id) => setTasks((ts) => removeTask(ts, id))}
-          onDirtyChange={(d) => {
-            dirtyRef.current = d;
-          }}
-          notify={notify}
-        />
-      )}
+        {pid !== null && config && openId !== null && openInitial !== null && (
+          <TaskEditor
+            key={openId}
+            pid={pid}
+            task={openTaskNow}
+            initial={openInitial}
+            categories={config.categories}
+            onClose={closeEditor}
+            onTask={(t) => setTasks((ts) => upsertTask(ts, t))}
+            onGone={(id) => setTasks((ts) => removeTask(ts, id))}
+            onDirtyChange={(d) => {
+              dirtyRef.current = d;
+            }}
+            notify={notify}
+          />
+        )}
+      </div>
 
       <div class="toasts" role="status" aria-live="polite">
         {toasts.map((t) => (

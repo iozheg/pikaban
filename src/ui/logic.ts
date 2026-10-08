@@ -128,6 +128,29 @@ export function statusLabel(p: ProjectSummary): string {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Labels. The UI calls the "user" assignee "developer"; the data value stays `user`.
+
+const CATEGORY_LABELS: Record<string, string> = {
+  backlog: "Backlog",
+  todo: "To do",
+  in_progress: "In progress",
+  review: "Review",
+  done: "Done",
+};
+
+/** The sentence-case name of a category. Categories from config.json without a fixed label: "_" → " ", first letter upper case. */
+export function categoryLabel(category: string): string {
+  const fixed = CATEGORY_LABELS[category];
+  if (fixed !== undefined) return fixed;
+  const words = category.replace(/_+/g, " ").trim();
+  return words === "" ? category : words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+export function assigneeLabel(assignee: Assignee): string {
+  return assignee === "agent" ? "Agent" : assignee === "user" ? "Developer" : "Nobody";
+}
+
+// ---------------------------------------------------------------------------------------------
 // Live updates (design 7.3)
 
 export type EventPlan =

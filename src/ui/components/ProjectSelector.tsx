@@ -14,11 +14,24 @@ interface ProjectSelectorProps {
  */
 export function ProjectSelector({ projects, selected, onSelect }: ProjectSelectorProps) {
   const unavailable = projects.filter((p) => !isAvailable(p));
+  const current = projects.find((p) => p.pid === selected) ?? null;
   return (
     <div class="project-selector">
-      <label class="field-inline">
-        <span class="field-label">Project</span>
+      {/* The native select lies over the button, transparent: it keeps the keyboard and the option list. */}
+      <label class="project-button">
+        <span class="project-name">{current ? current.name : projects.length === 0 ? "No projects" : "Select a project"}</span>
+        {/* On hover: the name and the path. */}
+        {current && (
+          <span class="project-tooltip" aria-hidden="true">
+            <span class="project-name">{current.name}</span>
+            <span class="project-root">{current.root}</span>
+          </span>
+        )}
+        <span class="project-caret" aria-hidden="true">
+          ▼
+        </span>
         <select
+          aria-label="Project"
           value={selected ?? ""}
           onChange={(e) => {
             const el = e.currentTarget;

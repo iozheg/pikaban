@@ -3,7 +3,9 @@ import {
   ApiError,
   apiErrorFrom,
   applyCurrent,
+  assigneeLabel,
   buildPatch,
+  categoryLabel,
   columnsOf,
   draftOf,
   editorReducer,
@@ -139,6 +141,28 @@ describe("projects", () => {
   it("gives null if no project is available", () => {
     expect(pickProject([project("x", "invalid")], "x")).toBeNull();
     expect(pickProject([], null)).toBeNull();
+  });
+});
+
+describe("labels", () => {
+  it("names the default categories in sentence case", () => {
+    expect(["backlog", "todo", "in_progress", "review", "done"].map(categoryLabel)).toEqual([
+      "Backlog",
+      "To do",
+      "In progress",
+      "Review",
+      "Done",
+    ]);
+  });
+
+  it("makes a label for other categories from config.json", () => {
+    expect(categoryLabel("waiting_for_qa")).toBe("Waiting for qa");
+    expect(categoryLabel("ideas")).toBe("Ideas");
+    expect(categoryLabel("_")).toBe("_");
+  });
+
+  it('calls the "user" assignee "Developer"', () => {
+    expect([null, "agent", "user"].map((a) => assigneeLabel(a as Task["assignee"]))).toEqual(["Nobody", "Agent", "Developer"]);
   });
 });
 

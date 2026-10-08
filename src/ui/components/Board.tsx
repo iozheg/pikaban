@@ -1,5 +1,5 @@
-import { useState } from "preact/hooks";
-import { columnsOf } from "../logic.js";
+import { useLayoutEffect, useRef, useState } from "preact/hooks";
+import { categoryLabel, columnsOf } from "../logic.js";
 import type { InvalidFile, Task } from "../types.js";
 import { Card, ErrorCard } from "./Card.js";
 
@@ -11,14 +11,25 @@ interface BoardProps {
   tasks: Task[];
   invalid: InvalidFile[];
   selectedId: string | null;
+  /** "Waiting on developer": dim the cards without `needs_input`. */
+  waitingFilter: boolean;
   onOpen(id: string): void;
   onMove(id: string, category: string): void;
+  /** Makes a task in the column. Resolves to false if it failed (the input then keeps the title). */
+  onCreate(title: string, category: string): Promise<boolean>;
 }
 
 /** One column for each category (design 7.1 item 2). HTML5 drag and drop moves a card (item 4). */
-export function Board({ categories, tasks, invalid, selectedId, onOpen, onMove }: BoardProps) {
+export function Board(props: BoardProps) {
+  const { categories, tasks, invalid, selectedId, waitingFilter, onOpen, onMove, onCreate } = props;
   const [dragId, setDragId] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  // The "+ Add task" input: one column at a time.
+  const [addingColumn, setAddingColumn] = useState<string | null>(null);
+  const [addTitle, setAddTitle] = useState("");
+  const [adding, setAdding] = useState(false);
+  const addRef = useRef<HTMLInputElement>(null);
+  useLayoutEffect(() => addRef.current?.focus(), [addingColumn]);
   const columns = columnsOf(categories, tasks);
   const dragFrom = dragId === null ? undefined : tasks.find((t) => t.id === dragId)?.category;
 
@@ -34,6 +45,25 @@ export function Board({ categories, tasks, invalid, selectedId, onOpen, onMove }
     setOver(null);
   };
   const accepts = (e: DragEvent) => e.dataTransfer?.types.includes(DRAG_TYPE) ?? false;
+
+  const startAdd = (category: string) => {
+    setAddingColumn(category);
+    setAddTitle("");
+  };
+  // While the request runs, blur and Escape do not cancel: the task is made anyway.
+  const cancelAdd = () => {
+    if (!adding) setAddingColumn(null);
+  };
+  async function submitAdd(category: string) {
+    const title = addTitle.trim();
+    if (title === "" || adding) return;
+    setAdding(true);
+    try {
+      if (await onCreate(title, category)) setAddingColumn(null);
+    } finally {
+      setAdding(false);
+    }
+  }
 
   return (
     <div class="board-wrap">
@@ -57,7 +87,7 @@ export function Board({ categories, tasks, invalid, selectedId, onOpen, onMove }
           <section
             key={col.category}
             class={`column${over === col.category && dragFrom !== col.category ? " is-over" : ""}`}
-            aria-label={`Column ${col.category}`}
+            aria-label={`Column ${categoryLabel(col.category)}`}
             onDragOver={(e) => {
               if (!accepts(e)) return;
               e.preventDefault();
@@ -79,8 +109,8 @@ export function Board({ categories, tasks, invalid, selectedId, onOpen, onMove }
             }}
           >
             <h2 class="column-head">
-              <span class="column-name">{col.category}</span>
-              <span class="count">{col.tasks.length}</span>
+              <span class="column-name">{categoryLabel(col.category)}</span>
+              <span class="column-count">{col.tasks.length}</span>
             </h2>
             <ul class="card-list">
               {col.tasks.map((t) => (
@@ -89,13 +119,41 @@ export function Board({ categories, tasks, invalid, selectedId, onOpen, onMove }
                   task={t}
                   selected={t.id === selectedId}
                   dragging={t.id === dragId}
+                  dimmed={waitingFilter && !t.needs_input}
                   onOpen={onOpen}
                   onDragStart={onDragStart}
                   onDragEnd={endDrag}
                 />
               ))}
             </ul>
-            {col.tasks.length === 0 && <p class="column-empty">No tasks</p>}
+            {addingColumn === col.category ? (
+              <input
+                type="text"
+                ref={addRef}
+                class="add-input"
+                placeholder="Task title, then Enter"
+                aria-label={`New task in ${categoryLabel(col.category)}`}
+                value={addTitle}
+                readOnly={adding}
+                onInput={(e) => setAddTitle(e.currentTarget.value)}
+                onBlur={cancelAdd}
+                onKeyDown={(e) => {
+                  if (e.isComposing) return;
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void submitAdd(col.category);
+                  } else if (e.key === "Escape") {
+                    // The editor also closes on Escape: this Escape is for the input only.
+                    e.preventDefault();
+                    cancelAdd();
+                  }
+                }}
+              />
+            ) : (
+              <button type="button" class="add-button" onClick={() => startAdd(col.category)}>
+                + Add task
+              </button>
+            )}
           </section>
         ))}
       </div>

@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "preact/hooks";
 import { api } from "../api.js";
 import {
+  assigneeLabel,
   buildPatch,
+  categoryLabel,
   CONFLICT_MESSAGE,
   editorReducer,
   errorMessage,
@@ -31,15 +33,13 @@ interface TaskEditorProps {
   notify(message: string): void;
 }
 
-const ASSIGNEES: { value: string; label: string }[] = [
-  { value: "", label: "none" },
-  { value: "agent", label: "agent" },
-  { value: "user", label: "user" },
-];
+const ASSIGNEES: Assignee[] = [null, "agent", "user"];
+
+const SAVE_SHORTCUT = /Mac|iPhone|iPad/.test(navigator.userAgent) ? "⌘S" : "Ctrl+S";
 
 const toAssignee = (v: string): Assignee => (v === "agent" || v === "user" ? v : null);
 
-/** The task editor (design 7.1 items 5, 6, 7 and 8). A side panel. */
+/** The task editor (design 7.1 items 5, 6, 7 and 8). A side panel docked next to the board. */
 export function TaskEditor(props: TaskEditorProps) {
   const { pid, task, initial, categories, onClose, onTask, onGone, onDirtyChange, notify } = props;
   const [s, dispatch] = useReducer(editorReducer, initial, initEditor);
@@ -47,8 +47,10 @@ export function TaskEditor(props: TaskEditorProps) {
   const [error, setError] = useState<string | null>(null);
   // The body shows as rendered Markdown until the user clicks Edit.
   const [editing, setEditing] = useState(false);
-  const titleRef = useRef<HTMLInputElement>(null);
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   const dirty = isDirty(s);
   const gone = s.conflict ? s.conflict.current === null : s.disk?.task === null;
@@ -58,8 +60,15 @@ export function TaskEditor(props: TaskEditorProps) {
   useEffect(() => dispatch({ type: "disk", task }), [task]);
   useEffect(() => onDirtyChange(dirty), [dirty]);
   useEffect(() => () => onDirtyChange(false), []);
-  useEffect(() => titleRef.current?.focus(), []);
+  useEffect(() => () => clearTimeout(copiedTimer.current), []);
+  // The title grows with its text.
   useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [s.draft.title]);
+  useLayoutEffect(() => {
     if (!editing || !bodyRef.current) return;
     bodyRef.current.setSelectionRange(0, 0);
     bodyRef.current.focus();
@@ -183,62 +192,83 @@ export function TaskEditor(props: TaskEditorProps) {
   // During a conflict the fields stay editable: the user can merge the disk text into the draft, then "Use mine".
   const locked = busy;
 
+  async function copyShort() {
+    try {
+      await navigator.clipboard.writeText(base.short);
+    } catch (err) {
+      notify(`Cannot copy ${base.short}: ${errorMessage(err)}`);
+      return;
+    }
+    setCopied(true);
+    clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(false), 1500);
+  }
+
   return (
     <aside class={`editor${s.conflict ? " has-conflict" : ""}`} aria-label={`Task ${base.short}`}>
       <header class="editor-head">
-        <div>
-          <span class="card-short">{base.short}</span>
-          {dirty && <span class="unsaved"> · unsaved changes</span>}
-        </div>
-        <button type="button" class="icon-button" onClick={requestClose} aria-label="Close the editor" title="Close (Esc)">
+        {/* The task number and the icon are one button: a click on either copies the number. */}
+        <button
+          type="button"
+          class="copy-button"
+          onClick={() => void copyShort()}
+          title="Copy task number"
+          aria-label={`Copy task number ${base.short}`}
+        >
+          <span class="editor-short">{base.short}</span>
+          <CopyIcon />
+          {copied && <span class="copied">Copied</span>}
+        </button>
+        <span class="spacer" />
+        <button type="button" class="close-button" onClick={requestClose} aria-label="Close the editor" title="Close (Esc)">
           ×
         </button>
       </header>
 
-      {s.disk && !s.conflict && (
-        <div class="notice notice-warn" role="status">
-          {s.disk.task ? (
-            <>
-              <p>This task changed on disk. Your unsaved edits are kept. If you save, the editor shows both versions.</p>
-              <button type="button" onClick={discardMine}>
-                Discard mine and load the disk version
-              </button>
-            </>
-          ) : (
-            <>
-              <p>This task was deleted on disk. You cannot save it. Copy your text if you need it.</p>
-              <button type="button" onClick={onClose}>
-                Close
-              </button>
-            </>
-          )}
-        </div>
-      )}
-
-      {s.conflict && (
-        <div class="notice notice-error" role="alert">
-          {s.conflict.current ? (
-            <p>
-              This task changed on disk before your save. Your text is kept in the editor. Compare it with the
-              version on disk.
-            </p>
-          ) : (
-            <p>This task was deleted on disk before your save. Your text is kept in the editor. Copy it if you need it.</p>
-          )}
-          <div class="button-row">
-            {s.conflict.current && (
-              <button type="button" class="primary" disabled={busy} onClick={() => void useMine()}>
-                Use mine
-              </button>
+      <div class="editor-body">
+        {s.disk && !s.conflict && (
+          <div class="notice notice-warn" role="status">
+            {s.disk.task ? (
+              <>
+                <p>This task changed on disk. Your unsaved edits are kept. If you save, the editor shows both versions.</p>
+                <button type="button" onClick={discardMine}>
+                  Discard mine and load the disk version
+                </button>
+              </>
+            ) : (
+              <>
+                <p>This task was deleted on disk. You cannot save it. Copy your text if you need it.</p>
+                <button type="button" onClick={onClose}>
+                  Close
+                </button>
+              </>
             )}
-            <button type="button" disabled={busy} onClick={discardMine}>
-              Discard mine
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
-      <div class="editor-main">
+        {s.conflict && (
+          <div class="notice notice-error" role="alert">
+            {s.conflict.current ? (
+              <p>
+                This task changed on disk before your save. Your text is kept in the editor. Compare it with the
+                version on disk.
+              </p>
+            ) : (
+              <p>This task was deleted on disk before your save. Your text is kept in the editor. Copy it if you need it.</p>
+            )}
+            <div class="button-row">
+              {s.conflict.current && (
+                <button type="button" class="primary" disabled={busy} onClick={() => void useMine()}>
+                  Use mine
+                </button>
+              )}
+              <button type="button" disabled={busy} onClick={discardMine}>
+                Discard mine
+              </button>
+            </div>
+          </div>
+        )}
+
         <form
           class="editor-form"
           onSubmit={(e) => {
@@ -246,22 +276,38 @@ export function TaskEditor(props: TaskEditorProps) {
             void save();
           }}
         >
-          <div class="field">
-            <input
-              ref={titleRef}
-              type="text"
-              aria-label="Title"
-              placeholder="Title"
-              value={s.draft.title}
-              required
-              readOnly={locked}
-              onInput={(e) => edit({ title: e.currentTarget.value })}
-            />
-          </div>
+          {/* A textarea, so that a long title wraps like a heading. A title has no line breaks. */}
+          <textarea
+            ref={titleRef}
+            class="title-input"
+            rows={1}
+            aria-label="Title"
+            placeholder="Title"
+            value={s.draft.title}
+            required
+            readOnly={locked}
+            onInput={(e) => edit({ title: e.currentTarget.value.replace(/[\r\n]+/g, " ") })}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.preventDefault();
+            }}
+          />
 
-          <div class="field-row">
+          <label
+            class={`needs-toggle${s.draft.needs_input ? " is-on" : ""}`}
+            title="Saving a changed description clears this flag, unless you change this box yourself."
+          >
+            <input
+              type="checkbox"
+              checked={s.draft.needs_input}
+              disabled={locked}
+              onChange={(e) => edit({ needs_input: e.currentTarget.checked })}
+            />
+            Needs input from developer
+          </label>
+
+          <div class="field-grid">
             <label class="field">
-              <span class="field-label">Category</span>
+              <span class="field-label">Status</span>
               <select
                 value={s.draft.category}
                 disabled={locked}
@@ -269,7 +315,7 @@ export function TaskEditor(props: TaskEditorProps) {
               >
                 {categories.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {categoryLabel(c)}
                   </option>
                 ))}
               </select>
@@ -282,8 +328,8 @@ export function TaskEditor(props: TaskEditorProps) {
                 onChange={(e) => edit({ assignee: toAssignee(e.currentTarget.value) })}
               >
                 {ASSIGNEES.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
+                  <option key={a} value={a ?? ""}>
+                    {assigneeLabel(a)}
                   </option>
                 ))}
               </select>
@@ -291,49 +337,37 @@ export function TaskEditor(props: TaskEditorProps) {
           </div>
 
           <div class="field">
-            <label class="check">
-              <input
-                type="checkbox"
-                checked={s.draft.needs_input}
-                disabled={locked}
-                onChange={(e) => edit({ needs_input: e.currentTarget.checked })}
-              />
-              <span>Needs input from the user</span>
-            </label>
-            <p class={`hint${willClear ? " hint-warn" : ""}`}>
-              {willClear
-                ? "You changed the body: Save clears “needs input”. To keep the flag, clear the box and set it again."
-                : "When you save a changed body, the flag is cleared, unless you change this box yourself."}
-            </p>
-          </div>
-
-          <div class="field body-field">
-            {!editing && (
-              <button
-                type="button"
-                class="icon-button body-edit"
-                onClick={() => setEditing(true)}
-                aria-label="Edit the body"
-                title="Edit"
-              >
-                <PencilIcon />
-              </button>
-            )}
+            <span class="field-label">Description</span>
             {editing ? (
-              <textarea
-                ref={bodyRef}
-                class="body-input"
-                aria-label="Body (Markdown)"
-                placeholder="Description (Markdown)"
-                value={s.draft.body}
-                readOnly={locked}
-                spellcheck
-                onInput={(e) => edit({ body: e.currentTarget.value })}
-              />
-            ) : s.draft.body.trim() === "" ? (
-              <div class="preview preview-empty">No description.</div>
+              <>
+                <textarea
+                  ref={bodyRef}
+                  class="body-input"
+                  rows={10}
+                  aria-label="Description (Markdown)"
+                  placeholder="Description (Markdown)"
+                  value={s.draft.body}
+                  readOnly={locked}
+                  spellcheck
+                  onInput={(e) => edit({ body: e.currentTarget.value })}
+                />
+                <p class={`hint${willClear ? " hint-warn" : ""}`}>
+                  {base.needs_input && !s.needsTouched ? "Saving clears “needs input”." : "Markdown"}
+                </p>
+              </>
             ) : (
-              <div class="markdown preview" dangerouslySetInnerHTML={{ __html: preview }} />
+              // A click anywhere in the text starts editing (the click on the pencil button bubbles up to here);
+              // the pencil button is the keyboard way.
+              <div class="preview" onClick={() => setEditing(true)}>
+                <button type="button" class="body-edit" aria-label="Edit the description" title="Edit">
+                  <PencilIcon />
+                </button>
+                {s.draft.body.trim() === "" ? (
+                  <p class="preview-empty">No description. Click to add one.</p>
+                ) : (
+                  <div class="markdown" dangerouslySetInnerHTML={{ __html: preview }} />
+                )}
+              </div>
             )}
           </div>
 
@@ -357,17 +391,24 @@ export function TaskEditor(props: TaskEditorProps) {
                 Close
               </button>
             )}
+            {dirty && <span class="unsaved">Unsaved changes</span>}
             <span class="spacer" />
-            <button type="button" class="danger" disabled={busy || gone || s.conflict !== null} onClick={() => void remove()}>
-              Delete
-            </button>
+            <span class="shortcut">{SAVE_SHORTCUT}</span>
           </div>
 
-          <p class="meta">
-            <span title={base.id}>{base.file}</span>
-            <br />
-            Created {formatTime(base.created_at)} · Updated {formatTime(base.updated_at)}
-          </p>
+          <footer class="editor-foot">
+            <div class="meta">
+              <span class="meta-file" title={base.id}>
+                {base.file}
+              </span>
+              <span class="meta-dates">
+                Created {formatTime(base.created_at)} · Updated {formatTime(base.updated_at)}
+              </span>
+            </div>
+            <button type="button" class="delete-button" disabled={busy || gone || s.conflict !== null} onClick={() => void remove()}>
+              Delete
+            </button>
+          </footer>
         </form>
 
         {s.conflict?.current && <DiskVersion task={s.conflict.current} />}
@@ -385,6 +426,15 @@ function PencilIcon() {
   );
 }
 
+function CopyIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+    </svg>
+  );
+}
+
 /** The version on disk after a conflict, next to the user's text. */
 function DiskVersion({ task }: { task: Task }) {
   return (
@@ -393,10 +443,10 @@ function DiskVersion({ task }: { task: Task }) {
       <dl class="disk-fields">
         <dt>Title</dt>
         <dd>{task.title}</dd>
-        <dt>Category</dt>
-        <dd>{task.category}</dd>
+        <dt>Status</dt>
+        <dd>{categoryLabel(task.category)}</dd>
         <dt>Assignee</dt>
-        <dd>{task.assignee ?? "none"}</dd>
+        <dd>{assigneeLabel(task.assignee)}</dd>
         <dt>Needs input</dt>
         <dd>{task.needs_input ? "yes" : "no"}</dd>
       </dl>
