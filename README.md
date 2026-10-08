@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.png" alt="pikaban logo: a pika peeking over a kanban board" width="160" /></p>
+
 # pikaban
 
 A local task tracker for one person and one AI coding agent (Claude Code) working on the same project. Tasks are Markdown files in a hidden `.pikaban/` folder in your project; the agent changes them through the `pikaban` CLI, and you see them on a Kanban board in your browser (`pikaban ui`).
