@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import { fileName, nextShort } from "./ids.js";
 import type { Project } from "./project.js";
 import { SCHEMA_VERSION } from "./schema.js";
-import { changeShort, list, type Task } from "./tasks.js";
+import { changeShort, list, reservedShorts, type Task } from "./tasks.js";
 
 export type CheckIssueKind =
   | "schema_version"
@@ -71,7 +71,7 @@ export function check(p: Project, opts: CheckOptions = {}): CheckReport {
       message: `${t.short} is also the short name of ${older.id}`,
     };
     if (opts.fix) {
-      const short = nextShort(live);
+      const short = nextShort(live, reservedShorts(invalid));
       tasks[i] = changeShort(p, t, short);
       live[i]!.short = short;
       issue.message += `. New short name: ${short}`;

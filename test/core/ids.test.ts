@@ -45,6 +45,11 @@ describe("nextShort", () => {
     ).toBe("task-0044");
   });
 
+  it("skips reserved short names (task files that are not valid)", () => {
+    expect(nextShort([{ id: A, short: "task-0006" }], ["task-0007", "task-0008"])).toBe("task-0009");
+    expect(nextShort([], ["task-0001"])).toBe("task-0002");
+  });
+
   it("continues at task-0001 after task-9999, or at the next free number", () => {
     expect(nextShort([{ id: A, short: "task-9999" }])).toBe("task-0001");
     expect(

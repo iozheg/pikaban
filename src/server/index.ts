@@ -111,7 +111,8 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 
 /** Listens on `port`, or on the next ports if it is in use (`tries` ports in total). Returns the port. */
 async function listen(server: Server, host: string, port: number, tries: number): Promise<number> {
-  for (let i = 0; i < tries; i++) {
+  const last = Math.min(port + tries - 1, 65535);
+  for (let i = 0; port + i <= last; i++) {
     const p = port + i;
     try {
       await new Promise<void>((resolve, reject) => {
@@ -130,14 +131,14 @@ async function listen(server: Server, host: string, port: number, tries: number)
       return (server.address() as AddressInfo).port;
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
-      if (code !== "EADDRINUSE" || p > 65535) {
+      if (code !== "EADDRINUSE") {
         throw new PikabanError(EXIT_GENERAL, `cannot start the server on ${host}:${p}: ${(err as Error).message}`, {
           cause: err,
         });
       }
     }
   }
-  const range = tries === 1 ? `Port ${port} is` : `Ports ${port} to ${port + tries - 1} are`;
+  const range = last <= port ? `Port ${port} is` : `Ports ${port} to ${last} are`;
   throw new PikabanError(EXIT_GENERAL, `${range} in use. Use --port <n> with a free port.`);
 }
 

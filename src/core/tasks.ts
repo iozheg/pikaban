@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 import { EXIT_CONFLICT, EXIT_VALIDATION, PikabanError } from "./errors.js";
 import { parseTaskFile, serializeTaskFile } from "./frontmatter.js";
 import { atomicWrite, contentHash, createExclusive } from "./fs.js";
-import { fileName, newUlid, nextShort, resolveRef } from "./ids.js";
+import { fileName, newUlid, nextShort, parseRef, resolveRef, shortOfFileName } from "./ids.js";
 import { assertWritable, type Project } from "./project.js";
 import {
   TaskPatchSchema,
@@ -71,6 +71,20 @@ export function list(p: Project, filter: TaskFilter = {}): TaskList {
 
 /** Finds one task by short name or ULID. Codes 3 and 4. */
 export function get(p: Project, ref: string): Task {
+  const r = parseRef(ref);
+  if (r.kind === "id") {
+    // The file name has the ULID: read only that file. Other cases (no such file, a file name that does
+    // not agree with the frontmatter, a file that is not valid) use the full list below.
+    const named = taskFilePaths(p.tasksDir).filter((f) => f.endsWith(`-${r.id}.md`));
+    if (named.length === 1) {
+      try {
+        const t = readTask(p, named[0]!);
+        if (t.id === r.id) return t;
+      } catch {
+        // The full list reports the file as not valid.
+      }
+    }
+  }
   const { tasks, invalid } = list(p);
   const hint = invalid.length > 0 ? ` (${invalid.length} task file(s) are not valid: run "pikaban check")` : "";
   return resolveRef(tasks, ref, hint);
@@ -80,7 +94,8 @@ export function create(p: Project, input: { title: string; body?: string; catego
   assertWritable(p);
   mkdirSync(p.tasksDir, { recursive: true });
   const now = new Date().toISOString();
-  const short = nextShort(list(p).tasks);
+  const { tasks, invalid } = list(p);
+  const short = nextShort(tasks, reservedShorts(invalid));
   const frontmatter: TaskFrontmatter = {
     id: newUlid(),
     short,
@@ -138,8 +153,14 @@ export function remove(p: Project, ref: string, opts: WriteOptions = {}): Task {
   assertWritable(p);
   const task = get(p, ref);
   checkMatch(task, opts.ifMatch);
+  assertUnchanged(task);
   unlinkSync(task.file);
   return task;
+}
+
+/** The short names in the file names of task files that are not valid: a new short name must not take them. */
+export function reservedShorts(invalid: readonly InvalidTaskFile[]): string[] {
+  return invalid.flatMap((f) => shortOfFileName(basename(f.file)) ?? []);
 }
 
 /** Absolute paths of the `*.md` files at depth 0 of a tasks folder, sorted by name. */

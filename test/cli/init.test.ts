@@ -147,6 +147,17 @@ describe("pikaban init: errors write nothing", () => {
     expect(existsSync(join(sb.dir, ".pikaban", "config.json"))).toBe(true);
     expect(JSON.parse(readFileSync(globalConfig(), "utf8")).projects).toEqual([sb.dir]);
   });
+
+  it("only the permission rule fails after the project skill: the message gives the command once", () => {
+    // A folder where the settings backup must be: the skill installs, then the permission rule fails.
+    mkdirSync(join(sb.dir, ".claude", "settings.json.bak"), { recursive: true });
+    writeFileSync(projectSettings(), "{}\n");
+    const r = sb.run(["init", "--skill", "project", "--allow"]);
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain("installed the project skill");
+    const command = `pikaban -C ${JSON.stringify(sb.dir)} skill install --project --allow`;
+    expect(r.stderr.split(command)).toHaveLength(2);
+  });
 });
 
 describe("pikaban init: git", () => {

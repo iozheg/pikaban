@@ -242,6 +242,13 @@ describe("buildPatch", () => {
     expect(buildPatch(base, draft, false)).toEqual({ title: "Better title", category: "todo", assignee: "agent" });
   });
 
+  it("an untouched title with spaces around it is no change", () => {
+    const spaced = task(A, { title: " Fix login " });
+    expect(buildPatch(spaced, draftOf(spaced), false)).toEqual({});
+    expect(isDirty(initEditor(spaced))).toBe(false);
+    expect(buildPatch(spaced, { ...draftOf(spaced), category: "todo" }, false)).toEqual({ category: "todo" });
+  });
+
   it("sends assignee null to remove the assignee", () => {
     const b = task(A, { assignee: "user" });
     expect(buildPatch(b, { ...draftOf(b), assignee: null }, false)).toEqual({ assignee: null });

@@ -22,14 +22,20 @@ export function shortNumber(short: string): number {
 
 /**
  * Short name for a new task (design 2.4): the number of the newest live task (highest ULID) plus 1.
- * After 9999, continue at 0001. Skip numbers that live tasks already have.
+ * After 9999, continue at 0001. Skip numbers that live tasks or `reserved` already have.
  */
-export function nextShort(liveTasks: readonly { id: string; short: string }[]): string {
-  if (liveTasks.length === 0) return formatShort(1);
-  let newest = liveTasks[0]!;
-  for (const t of liveTasks) if (t.id > newest.id) newest = t;
-  const used = new Set(liveTasks.map((t) => shortNumber(t.short)));
-  let n = shortNumber(newest.short);
+export function nextShort(
+  liveTasks: readonly { id: string; short: string }[],
+  /** Short names that are also in use (for example, in the names of task files that are not valid). */
+  reserved: readonly string[] = [],
+): string {
+  const used = new Set([...liveTasks.map((t) => t.short), ...reserved].map(shortNumber));
+  let n = 0;
+  if (liveTasks.length > 0) {
+    let newest = liveTasks[0]!;
+    for (const t of liveTasks) if (t.id > newest.id) newest = t;
+    n = shortNumber(newest.short);
+  }
   for (let i = 0; i < SHORT_MAX; i++) {
     n = (n % SHORT_MAX) + 1;
     if (!used.has(n)) return formatShort(n);
@@ -58,6 +64,11 @@ export function parseRef(text: string): TaskRef {
 /** `task-XXXX-<ULID>.md` */
 export function fileName(short: string, id: string): string {
   return `${short}-${id}.md`;
+}
+
+/** The short name at the start of a task file name, or undefined. */
+export function shortOfFileName(name: string): string | undefined {
+  return /^(task-\d{4})-/.exec(name)?.[1];
 }
 
 /**

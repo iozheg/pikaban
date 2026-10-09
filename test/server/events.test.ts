@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addProject,
   appendNote,
@@ -15,7 +15,7 @@ import {
   update,
 } from "../../src/core/index.js";
 import type { RunningServer } from "../../src/server/index.js";
-import { idFromFileName } from "../../src/server/watcher.js";
+import { idFromFileName, PikabanWatcher } from "../../src/server/watcher.js";
 import { CLI } from "../cli/run.js";
 import { taskText } from "../helpers.js";
 import { makeEnv, request, sse, start, warmUp, type Env, type SseClient } from "./helpers.js";
@@ -206,6 +206,31 @@ describe("GET /api/events", () => {
     writeFileSync(join(env.home, ".pikaban_config.json"), `${JSON.stringify({ projects: [alpha.root] })}\n`);
     await c.waitFor((e) => e.type === "projects" && c.events.filter((x) => x.type === "projects").length >= 2);
     expect((await request(server.port, "GET", "/api/projects")).status).toBe(200);
+  });
+
+  it("a failed project sync does not stop the next ones", async () => {
+    const errors: unknown[] = [];
+    const c = await connect({ onError: (err) => errors.push(err) });
+    const sync = vi
+      .spyOn(PikabanWatcher.prototype as unknown as { syncProjects(): Promise<void> }, "syncProjects")
+      .mockRejectedValueOnce(new Error("sync failed"));
+    try {
+      const betaRoot = join(env.base, "beta");
+      mkdirSync(betaRoot);
+      initProject(betaRoot, prepareInit(betaRoot));
+      addProject(betaRoot, env.home);
+      await vi.waitFor(() => expect(errors).toHaveLength(1));
+      expect(c.events.some((e) => e.type === "projects")).toBe(false);
+
+      // The next change of the global config syncs again: beta gets a watcher.
+      removeProject(alpha.root, env.home);
+      await c.waitFor((e) => e.type === "projects");
+      await warmUp(c, betaRoot);
+      const t = create(openProject(betaRoot), { title: "In beta" });
+      await c.waitFor((e) => e.id === t.id);
+    } finally {
+      sync.mockRestore();
+    }
   });
 
   it("sends heartbeat comments", async () => {

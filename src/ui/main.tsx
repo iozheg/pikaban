@@ -83,6 +83,8 @@ function App() {
   const dirtyRef = useRef(false);
   const preferredRef = useRef<string | null>(loadSelectedProject());
   const toastSeq = useRef(0);
+  // The last move of each task: the saved task, or null if the move failed.
+  const pendingMoves = useRef(new Map<string, Promise<Task | null>>());
 
   const notify = (text: string) => {
     const id = ++toastSeq.current;
@@ -220,24 +222,37 @@ function App() {
 
   // --- Board actions -----------------------------------------------------------------------------
 
-  async function moveTask(id: string, category: string) {
+  function moveTask(id: string, category: string) {
     const p = pidRef.current;
-    const prev = tasks.find((t) => t.id === id);
-    if (p === null || !prev || prev.category === category) return;
+    const shown = tasks.find((t) => t.id === id);
+    if (p === null || !shown || shown.category === category) return;
     setTasks((ts) => moveTaskLocal(ts, id, category));
-    try {
-      const saved = await api.patchTask(p, id, { category }, prev.etag);
-      if (pidRef.current === p) setTasks((ts) => upsertTask(ts, saved));
-    } catch (err) {
-      if (pidRef.current !== p) return;
-      if (isConflict(err)) {
-        setTasks((ts) => applyCurrent(ts, id, err.current ?? null));
-        notify(CONFLICT_MESSAGE);
-      } else {
-        setTasks((ts) => revertMove(ts, prev));
-        notify(`Cannot move ${prev.short}: ${errorMessage(err)}`);
+    // A second move before the first one ends waits for it and sends its new etag: the optimistic
+    // card still has the old one.
+    const before = pendingMoves.current.get(id);
+    const run = (async (): Promise<Task | null> => {
+      const prev = before ? await before : shown;
+      if (prev === null || pidRef.current !== p) return null;
+      try {
+        const saved = await api.patchTask(p, id, { category }, prev.etag);
+        if (pidRef.current === p) setTasks((ts) => upsertTask(ts, saved));
+        return saved;
+      } catch (err) {
+        if (pidRef.current !== p) return null;
+        if (isConflict(err)) {
+          setTasks((ts) => applyCurrent(ts, id, err.current ?? null));
+          notify(CONFLICT_MESSAGE);
+        } else {
+          setTasks((ts) => revertMove(ts, prev));
+          notify(`Cannot move ${prev.short}: ${errorMessage(err)}`);
+        }
+        return null;
       }
-    }
+    })();
+    pendingMoves.current.set(id, run);
+    void run.finally(() => {
+      if (pendingMoves.current.get(id) === run) pendingMoves.current.delete(id);
+    });
   }
 
   /** Makes a task from a column's "+ Add task" input and opens it. */
@@ -357,7 +372,7 @@ function App() {
               selectedId={openId}
               waitingFilter={waitingFilter}
               onOpen={openTask}
-              onMove={(id, c) => void moveTask(id, c)}
+              onMove={moveTask}
               onCreate={createTask}
             />
           )}

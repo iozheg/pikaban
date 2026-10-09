@@ -62,6 +62,12 @@ describe("create", () => {
     expect(readFileSync(b.file, "utf8").endsWith("---\n")).toBe(true);
   });
 
+  it("does not take the short name of a task file that is not valid", () => {
+    create(p, { title: "a" });
+    writeFileSync(join(tasksDir, "task-0002-01JA2BAD4D5E6F7G8H9J0KMNPV.md"), "---\ntitle: [broken\n---\n");
+    expect(create(p, { title: "b" }).short).toBe("task-0003");
+  });
+
   it("gives code 7 for an empty title or an unknown category, and writes nothing", () => {
     pikabanError(EXIT_VALIDATION, () => create(p, { title: " " }));
     pikabanError(EXIT_VALIDATION, () => create(p, { title: "x", category: "later" }));
@@ -130,6 +136,26 @@ describe("get", () => {
   it("uses the frontmatter, not the file name", () => {
     renameSync(join(tasksDir, "task-0042-01JA2B3C4D5E6F7G8H9J0KMNPQ.md"), join(tasksDir, "renamed.md"));
     expect(get(p, "42").file).toBe(join(tasksDir, "renamed.md"));
+    expect(get(p, "01JA2B3C4D5E6F7G8H9J0KMNPQ").file).toBe(join(tasksDir, "renamed.md"));
+  });
+
+  it("finds a task by ULID when another task file is not valid", () => {
+    writeFileSync(join(tasksDir, "bad.md"), "x");
+    expect(get(p, "01JA2B9X4D5E6F7G8H9J0KMNPR").short).toBe("task-0043");
+  });
+
+  it("gives code 3 with the hint for a ULID whose file is not valid", () => {
+    const file = join(tasksDir, "task-0042-01JA2B3C4D5E6F7G8H9J0KMNPQ.md");
+    writeFileSync(file, readFileSync(file, "utf8").replace("category: ", "category: later\nx: "));
+    expect(pikabanError(EXIT_NOT_FOUND, () => get(p, "01JA2B3C4D5E6F7G8H9J0KMNPQ")).message).toMatch(/not valid/);
+  });
+
+  it("finds a ULID through the frontmatter when the file name has another ULID", () => {
+    const inName = "01JA2BAD4D5E6F7G8H9J0KMNPV";
+    const inFile = "01JA2BAE4D5E6F7G8H9J0KMNPW";
+    writeFileSync(join(tasksDir, `task-0099-${inName}.md`), taskText({ id: inFile, short: "task-0099" }));
+    expect(get(p, inFile).short).toBe("task-0099");
+    pikabanError(EXIT_NOT_FOUND, () => get(p, inName));
   });
 
   it("gives code 3 for an unknown task, with a hint about invalid files", () => {

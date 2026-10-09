@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { addProject, create, openProject, update } from "../../src/core/index.js";
@@ -18,6 +19,22 @@ afterEach(async () => {
   await server?.close();
   server = undefined;
   env.cleanup();
+});
+
+describe("startServer", () => {
+  it("does not try ports after 65535", async () => {
+    // Port 65535 is in use (by this server, or by another program).
+    const blocker = createServer();
+    await new Promise<void>((resolve) => {
+      blocker.once("error", () => resolve());
+      blocker.listen(65535, "127.0.0.1", () => resolve());
+    });
+    try {
+      await expect(start(env, { port: 65535 })).rejects.toThrow("Port 65535 is in use");
+    } finally {
+      blocker.close();
+    }
+  });
 });
 
 describe("pid", () => {

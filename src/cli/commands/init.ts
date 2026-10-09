@@ -317,7 +317,10 @@ async function initSequence(
   if (answers.allow) {
     steps.push({
       done: "added the permission rule",
-      fix: allowWithSkill ? "" : `add "${PERMISSION_RULE}" to permissions.allow in ${settings}`,
+      // With a project skill, the same command as the skill step (partialError shows it once).
+      fix: allowWithSkill
+        ? skillInstallCommand("project", { root, allow: true })
+        : `add "${PERMISSION_RULE}" to permissions.allow in ${settings}`,
       run: () => {
         done.permission = addPermissionRule(settings);
       },
@@ -377,7 +380,7 @@ async function initSequence(
 /** A step after the start failed. `.pikaban/` stays. The message tells what is done and what to run. */
 function partialError(err: unknown, done: Step[], notDone: Step[]): PikabanError {
   const message = err instanceof Error ? err.message : String(err);
-  const fixes = notDone.map((s) => s.fix).filter((f) => f !== "");
+  const fixes = [...new Set(notDone.map((s) => s.fix))];
   const lines = [`pikaban init stopped: ${message}`];
   if (done.length > 0) lines.push(`Done: ${done.map((s) => s.done).join(", ")}.`);
   lines.push("Not done. Correct the problem, then run:", ...fixes.map((f) => `  ${f}`));

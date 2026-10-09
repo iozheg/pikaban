@@ -207,7 +207,8 @@ export function needsInputOnSave(base: Task, draft: Draft, needsTouched: boolean
 export function buildPatch(base: Task, draft: Draft, needsTouched: boolean): TaskPatch {
   const patch: TaskPatch = {};
   const title = draft.title.trim();
-  if (title !== base.title) patch.title = title;
+  // The core keeps spaces around a title: compare trimmed values, so an untouched title is no change.
+  if (title !== base.title.trim()) patch.title = title;
   if (draft.category !== base.category) patch.category = draft.category;
   if (draft.assignee !== base.assignee) patch.assignee = draft.assignee;
   if (draft.body !== base.body) patch.body = draft.body;

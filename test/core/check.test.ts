@@ -96,6 +96,16 @@ describe("check", () => {
     expect(readFileSync(bad, "utf8")).toBe("---\ntitle: x\n---\n");
   });
 
+  it("fix does not give the short name of a task file that is not valid", () => {
+    writeFileSync(newerFile(), taskText({ id: NEWER, short: "task-0042" }));
+    // Without the file that is not valid, the new short name is task-0046 (0043 to 0045 are in use).
+    writeFileSync(join(tasksDir, "task-0046-01JA2BAE4D5E6F7G8H9J0KMNPW.md"), "---\ntitle: x\n---\n");
+    const report = check(openProject(root, { write: true }), { fix: true });
+    const fixed = report.issues.find((i) => i.kind === "duplicate_short")!;
+    expect(fixed.fixed).toBe(true);
+    expect(fixed.message).toMatch(/New short name: task-0047$/);
+  });
+
   it("reports a lower schema version", () => {
     makeProject(root, { ...CONFIG, schema_version: 0 });
     const report = check(openProject(root));

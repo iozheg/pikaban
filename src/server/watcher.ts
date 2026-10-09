@@ -116,7 +116,11 @@ export class PikabanWatcher {
     this.globalWatcher.on("all", (_event, p) => {
       if (resolve(p) !== file) return;
       this.schedule("projects", () => {
-        this.sync = this.sync.then(() => this.syncProjects()).then(() => this.emitIfOpen({ type: "projects" }));
+        // The catch keeps the chain usable: one failed sync must not stop the next ones.
+        this.sync = this.sync
+          .then(() => this.syncProjects())
+          .then(() => this.emitIfOpen({ type: "projects" }))
+          .catch((err: unknown) => this.opts.onError?.(err));
       });
     });
     await ready(this.globalWatcher);
