@@ -47,7 +47,7 @@ pikaban ui
 
 | Question | Answers | Default | Flag |
 |---|---|---|---|
-| Optional categories (a list of two) | `backlog`, `review` (comma-separated) or `none` | `backlog` | `--backlog` / `--no-backlog`, `--review` / `--no-review` |
+| Optional categories (a list of two) | Check with the arrow keys and space, confirm with enter | `backlog` | `--backlog` / `--no-backlog`, `--review` / `--no-review` |
 | Install the agent skill? | `project` (`<project>/.claude/skills/pikaban/`), `user` (`~/.claude/skills/pikaban/`), `none` | `project` | `--skill <answer>` |
 | Let the agent run `pikaban` without permission prompts? | yes / no | no | `--allow` / `--no-allow` |
 | Keep the pikaban files in git? (only in a git repository) | yes / no | yes | `--git` / `--no-git` |

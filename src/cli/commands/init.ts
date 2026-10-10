@@ -41,7 +41,7 @@ import {
   type PermissionResult,
 } from "../../skill/settings.js";
 import { contextOf, type Context } from "../context.js";
-import { askChoice, askYesNo, isInteractive, withTerminal, type Ask } from "../prompt.js";
+import { askChoice, askYesNo, dim, isInteractive, withTerminal, type Ask, type Select } from "../prompt.js";
 import { describePermissionResult, describeSkillResult, skillConflictError } from "./skill.js";
 
 /** Options of `pikaban init`. */
@@ -82,8 +82,10 @@ export const INIT_DEFAULTS: Readonly<InitAnswers & { git: boolean }> = {
 export interface InitDeps {
   /** Default: stdin and stdout are a TTY, and not `--json`. */
   interactive?: boolean;
-  /** The question function. Default: the terminal (`node:readline/promises`). */
+  /** The question function. Default: the terminal (`node:readline`). */
   ask?: Ask;
+  /** The checkbox list for the categories. Without it, the categories are a text question. */
+  select?: Select;
 }
 
 export interface InitRunResult {
@@ -97,20 +99,34 @@ export interface InitRunResult {
   gitExcludes: string[];
 }
 
-export const SKILL_QUESTION = "Install the agent skill? project = <project>/.claude/skills/pikaban, user = ~/.claude/skills/pikaban";
-export const ALLOW_QUESTION = `Let the agent run pikaban without permission prompts? Adds "${PERMISSION_RULE}" to .claude/settings.json`;
-export const CATEGORIES_QUESTION = "Optional categories (todo, in_progress and done are always on):";
-export const GIT_QUESTION = "Keep the pikaban files in git? no = add them to .git/info/exclude";
+// Each question has a note: extra information, dimmed on a color terminal.
+export const SKILL_QUESTION = "Install the agent skill?";
+const SKILL_NOTE = "project = <project>/.claude/skills/pikaban, user = ~/.claude/skills/pikaban";
+export const ALLOW_QUESTION = "Let the agent run pikaban without permission prompts?";
+const ALLOW_NOTE = `Adds "${PERMISSION_RULE}" to .claude/settings.json`;
+export const CATEGORIES_QUESTION = "Optional categories";
+const CATEGORIES_NOTE = "(todo, in_progress and done are always on)";
+export const GIT_QUESTION = "Keep the pikaban files in git?";
+const GIT_NOTE = "no = add them to .git/info/exclude";
 export const CONFIRM_QUESTION = "Write these changes?";
 
+/** The optional categories: a checkbox list with `select`, otherwise a text question. */
+function askCategories(ask: Ask, select: Select | undefined, def: readonly OptionalCategory[]): Promise<OptionalCategory[]> {
+  if (select) {
+    const items = OPTIONAL_CATEGORIES.map((c) => ({ value: c, label: c, note: CATEGORY_DESCRIPTIONS[c] }));
+    return select(CATEGORIES_QUESTION, items, def, CATEGORIES_NOTE);
+  }
+  return askCategoryList(ask, def);
+}
+
 /** The list of the optional categories and the question. Empty gives the default. */
-async function askCategories(ask: Ask, def: readonly OptionalCategory[]): Promise<OptionalCategory[]> {
+async function askCategoryList(ask: Ask, def: readonly OptionalCategory[]): Promise<OptionalCategory[]> {
   const width = Math.max(...OPTIONAL_CATEGORIES.map((c) => c.length));
   const items = OPTIONAL_CATEGORIES.map(
-    (c) => `  [${def.includes(c) ? "x" : " "}] ${c.padEnd(width)}  ${CATEGORY_DESCRIPTIONS[c]}`,
+    (c) => `  [${def.includes(c) ? "x" : " "}] ${c.padEnd(width)}  ${dim(CATEGORY_DESCRIPTIONS[c])}`,
   );
   const shown = def.length === 0 ? "none" : def.join(",");
-  const question = `${CATEGORIES_QUESTION}\n${items.join("\n")}\nCategories to turn on (${OPTIONAL_CATEGORIES.join(",")} or none) [${shown}]: `;
+  const question = `${CATEGORIES_QUESTION} ${dim(CATEGORIES_NOTE)}:\n${items.join("\n")}\nCategories to turn on (${OPTIONAL_CATEGORIES.join(",")} or none) [${shown}]: `;
   for (let i = 0; i < 3; i++) {
     const a = (await ask(question)).trim().toLowerCase();
     if (a === "") return [...def];
@@ -144,7 +160,7 @@ function categoriesFromFlags(opts: InitCommandOptions): OptionalCategory[] {
  */
 export async function resolveInitAnswers(
   opts: InitCommandOptions,
-  io: { interactive: boolean; ask?: Ask; gitRepo?: boolean },
+  io: { interactive: boolean; ask?: Ask; select?: Select; gitRepo?: boolean },
 ): Promise<InitAnswers> {
   if (opts.skill !== undefined && !(SKILL_CHOICES as readonly string[]).includes(opts.skill)) {
     throw new PikabanError(EXIT_USAGE, `invalid --skill "${opts.skill}". Use ${SKILL_CHOICES.join(", ")}.`);
@@ -155,7 +171,7 @@ export async function resolveInitAnswers(
   const askable = io.interactive && io.ask !== undefined && !opts.yes;
   const categories =
     askable && opts.backlog === undefined && opts.review === undefined
-      ? await askCategories(io.ask!, INIT_DEFAULTS.categories)
+      ? await askCategories(io.ask!, io.select, INIT_DEFAULTS.categories)
       : categoriesFromFlags(opts);
   if (opts.yes) {
     skill ??= INIT_DEFAULTS.skill;
@@ -164,7 +180,7 @@ export async function resolveInitAnswers(
   const gitAnswer = async (): Promise<boolean | null> => {
     if (!io.gitRepo) return null;
     if (opts.git !== undefined) return opts.git;
-    return askable ? askYesNo(io.ask!, GIT_QUESTION, INIT_DEFAULTS.git) : INIT_DEFAULTS.git;
+    return askable ? askYesNo(io.ask!, GIT_QUESTION, INIT_DEFAULTS.git, GIT_NOTE) : INIT_DEFAULTS.git;
   };
   if (skill !== undefined && allow !== undefined) return { categories, skill, allow, git: await gitAnswer() };
 
@@ -178,8 +194,8 @@ export async function resolveInitAnswers(
         "Give the flags, or --yes for the defaults (--skill project, --no-allow). Nothing was written.",
     );
   }
-  skill ??= await askChoice(io.ask, SKILL_QUESTION, SKILL_CHOICES, INIT_DEFAULTS.skill);
-  allow ??= await askYesNo(io.ask, ALLOW_QUESTION, INIT_DEFAULTS.allow);
+  skill ??= await askChoice(io.ask, SKILL_QUESTION, SKILL_CHOICES, INIT_DEFAULTS.skill, SKILL_NOTE);
+  allow ??= await askYesNo(io.ask, ALLOW_QUESTION, INIT_DEFAULTS.allow, ALLOW_NOTE);
   return { categories, skill, allow, git: await gitAnswer() };
 }
 
@@ -215,8 +231,8 @@ export async function runInit(ctx: Context, opts: InitCommandOptions, deps: Init
   const interactive = deps.interactive ?? (!ctx.json && isInteractive());
   // 1. Checks, before the terminal opens, so that a quick error does not wait for input.
   const pre = preflight(ctx.startDir, opts, ctx.homeDir);
-  if (!interactive || deps.ask !== undefined) return initSequence(ctx, opts, pre, interactive, deps.ask);
-  return withTerminal((ask) => initSequence(ctx, opts, pre, true, ask));
+  if (!interactive || deps.ask !== undefined) return initSequence(ctx, opts, pre, interactive, deps);
+  return withTerminal((term) => initSequence(ctx, opts, pre, true, term));
 }
 
 async function initSequence(
@@ -224,13 +240,13 @@ async function initSequence(
   opts: InitCommandOptions,
   { config: defaults, listed, repo }: Preflight,
   interactive: boolean,
-  ask: Ask | undefined,
+  { ask, select }: { ask?: Ask; select?: Select },
 ): Promise<InitRunResult> {
   const paths = projectPaths(ctx.startDir);
   const root = paths.root;
 
   // 2-3. Answers.
-  const answers = await resolveInitAnswers(opts, { interactive, ask, gitRepo: repo !== null });
+  const answers = await resolveInitAnswers(opts, { interactive, ask, select, gitRepo: repo !== null });
   const config: ProjectConfig = { ...defaults, categories: categoriesWith(answers.categories) };
 
   // Find what each step will do. A skill conflict or invalid settings JSON stops here (no writes).

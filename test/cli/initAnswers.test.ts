@@ -13,7 +13,7 @@ import {
 } from "../../src/cli/commands/init.js";
 import type { Context } from "../../src/cli/context.js";
 import { Output } from "../../src/cli/output.js";
-import type { Ask } from "../../src/cli/prompt.js";
+import type { Ask, Select } from "../../src/cli/prompt.js";
 import { EXIT_GENERAL, EXIT_USAGE, PikabanError } from "../../src/core/errors.js";
 import { removeDir, tempDir } from "../helpers.js";
 
@@ -160,6 +160,19 @@ describe("resolveInitAnswers", () => {
     const bad = scripted({ categories: "verify" });
     await expect(resolveInitAnswers(flags, { interactive: true, ask: bad.ask })).rejects.toMatchObject({ code: EXIT_USAGE });
     expect(bad.asked).toHaveLength(3);
+  });
+
+  it("with a checkbox list, asks the categories there and not as text", async () => {
+    const s = scripted({});
+    const lists: { question: string; values: string[]; selected: readonly string[] }[] = [];
+    const select: Select = async (question, items, selected) => {
+      lists.push({ question, values: items.map((it) => it.value), selected });
+      return items.filter((it) => it.value === "review").map((it) => it.value);
+    };
+    const r = await resolveInitAnswers({ skill: "none", allow: false }, { interactive: true, ask: s.ask, select });
+    expect(r.categories).toEqual(["review"]);
+    expect(lists).toEqual([{ question: CATEGORIES_QUESTION, values: ["backlog", "review"], selected: ["backlog"] }]);
+    expect(s.asked).toEqual([]);
   });
 
   it("asks the git question only in a git repository", async () => {
