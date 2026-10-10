@@ -157,7 +157,7 @@ Packing: `npm pack` runs the build (through `prepare`) and ships only `dist/`, `
 ## Status and open items
 
 - Version 0.1.0, not published.
-- No license is chosen yet.
+- License: MIT (see `LICENSE`).
 - The git question in `pikaban init` is deferred: `init` does not touch git.
 - Tested on macOS only. Linux should work but is not tested; Windows is not tested and not in scope.
 - `npm install -g github:<user>/<repo>` does not work with npm 10 (see "From source").

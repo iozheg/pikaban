@@ -1,5 +1,6 @@
 {
   "name": "pikaban",
+  "license": "MIT",
   "version": "0.1.0",
   "description": "Local task tracker for one user and one AI coding agent",
   "keywords": [
