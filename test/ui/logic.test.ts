@@ -6,6 +6,7 @@ import {
   assigneeLabel,
   buildPatch,
   categoryLabel,
+  clampEditorWidth,
   columnsOf,
   draftOf,
   editorReducer,
@@ -331,5 +332,18 @@ describe("editor reducer", () => {
     const s2 = editorReducer(s, { type: "disk", task: newer });
     expect(s2.conflict).toEqual({ current: newer });
     expect(useMineRequest(s2)?.etag).toBe("etag-3");
+  });
+});
+
+describe("clampEditorWidth", () => {
+  it("keeps the width between the minimum and half of the area", () => {
+    expect(clampEditorWidth(500, 1600)).toBe(500);
+    expect(clampEditorWidth(1000, 1600)).toBe(800);
+    expect(clampEditorWidth(100, 1600)).toBe(320);
+    expect(clampEditorWidth(450.6, 1600)).toBe(451);
+  });
+
+  it("gives the minimum when half of the area is smaller", () => {
+    expect(clampEditorWidth(500, 500)).toBe(320);
   });
 });

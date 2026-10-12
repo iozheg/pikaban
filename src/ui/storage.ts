@@ -40,3 +40,24 @@ export function saveTheme(theme: Theme): void {
     // ignore
   }
 }
+
+const EDITOR_WIDTH_KEY = "pikaban.editorWidth";
+
+/** The saved editor width in px, or null: then the default width. */
+export function loadEditorWidth(): number | null {
+  try {
+    const v = Number(globalThis.localStorage?.getItem(EDITOR_WIDTH_KEY) ?? NaN);
+    return Number.isFinite(v) && v > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveEditorWidth(width: number | null): void {
+  try {
+    if (width === null) globalThis.localStorage?.removeItem(EDITOR_WIDTH_KEY);
+    else globalThis.localStorage?.setItem(EDITOR_WIDTH_KEY, String(width));
+  } catch {
+    // ignore
+  }
+}

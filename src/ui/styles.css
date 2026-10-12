@@ -740,9 +740,74 @@ textarea {
 
 /* --- Editor (docked next to the board) --- */
 
+/* The resize handle: a thin strip over the editor's left border. Takes no room in the layout. */
+.editor-resizer {
+  flex: none;
+  position: relative;
+  z-index: 2;
+  width: 9px;
+  margin: 0 -4px 0 -5px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.editor-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px 0 4px;
+  background: transparent;
+  transition: background-color 0.12s;
+}
+
+/* The grip: an always visible pill with a column of dots, in the middle of the border. */
+.editor-resizer::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 36px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  /* Four dots in the padded middle of the pill, over the surface colour. */
+  background:
+    radial-gradient(circle, var(--text-muted) 1px, transparent 1.5px) center / 100% 5px no-repeat space,
+    linear-gradient(var(--surface), var(--surface));
+  background-origin: content-box, padding-box;
+  background-clip: content-box, padding-box;
+  padding: 7px 0;
+  box-sizing: border-box;
+  transition: border-color 0.12s;
+}
+
+.editor-resizer:hover::after,
+.editor-resizer:focus-visible::after,
+body.is-resizing .editor-resizer::after {
+  background: var(--accent);
+}
+
+.editor-resizer:hover::before,
+.editor-resizer:focus-visible::before,
+body.is-resizing .editor-resizer::before {
+  border-color: var(--accent);
+}
+
+.editor-resizer:focus-visible {
+  outline: none;
+}
+
+/* While dragging: no text selection, and the cursor stays the resize cursor everywhere. */
+body.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
 .editor {
   flex: none;
-  width: 420px;
+  /* --editor-width: set by the resize handle. At most half of the window area. */
+  width: clamp(320px, var(--editor-width, 420px), 50%);
   display: flex;
   flex-direction: column;
   background: var(--surface);
@@ -1105,6 +1170,9 @@ textarea {
 @media (max-width: 760px) {
   .content {
     position: relative;
+  }
+  .editor-resizer {
+    display: none;
   }
   .editor {
     position: absolute;

@@ -7,7 +7,9 @@ import { TaskEditor } from "./components/TaskEditor.js";
 import {
   ApiError,
   applyCurrent,
+  clampEditorWidth,
   CONFLICT_MESSAGE,
+  EDITOR_DEFAULT_WIDTH,
   errorMessage,
   isAvailable,
   isConflict,
@@ -20,7 +22,15 @@ import {
   sortTasks,
   upsertTask,
 } from "./logic.js";
-import { loadSelectedProject, loadTheme, saveSelectedProject, saveTheme, type Theme } from "./storage.js";
+import {
+  loadEditorWidth,
+  loadSelectedProject,
+  loadTheme,
+  saveEditorWidth,
+  saveSelectedProject,
+  saveTheme,
+  type Theme,
+} from "./storage.js";
 import type { InvalidFile, ProjectSummary, Task, PikabanEvent } from "./types.js";
 import "./styles.css";
 
@@ -64,6 +74,58 @@ function ThemeSwitch() {
   );
 }
 
+/**
+ * The handle on the left edge of the editor: drag it, or focus it and press the arrow keys.
+ * Double-click: the default width. The width is at most half of the window area.
+ */
+function EditorResizer({ width, onWidth }: { width: number; onWidth(width: number | null, save: boolean): void }) {
+  const total = (el: HTMLElement) => el.parentElement?.clientWidth ?? window.innerWidth;
+  const onPointerDown = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const right = el.parentElement?.getBoundingClientRect().right ?? window.innerWidth;
+    let last = width;
+    const move = (ev: PointerEvent) => {
+      last = clampEditorWidth(right - ev.clientX, total(el));
+      onWidth(last, false);
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      el.removeEventListener("pointercancel", up);
+      document.body.classList.remove("is-resizing");
+      onWidth(last, true);
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    el.addEventListener("pointercancel", up);
+    document.body.classList.add("is-resizing");
+  };
+  const onKeyDown = (e: KeyboardEvent) => {
+    const step = e.shiftKey ? 80 : 20;
+    const d = e.key === "ArrowLeft" ? step : e.key === "ArrowRight" ? -step : 0;
+    if (d === 0) return;
+    e.preventDefault();
+    onWidth(clampEditorWidth(width + d, total(e.currentTarget as HTMLElement)), true);
+  };
+  return (
+    <div
+      class="editor-resizer"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize the task panel"
+      aria-valuenow={width}
+      tabIndex={0}
+      title="Drag to resize. Double-click: the default width."
+      onPointerDown={onPointerDown}
+      onKeyDown={onKeyDown}
+      onDblClick={() => onWidth(null, true)}
+    />
+  );
+}
+
 function App() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [projectsError, setProjectsError] = useState<string | null>(null);
@@ -77,6 +139,8 @@ function App() {
   // "Waiting on developer": dims the other cards. Not saved.
   const [waitingFilter, setWaitingFilter] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  // null: the default width. The CSS also keeps it at most half of the window area.
+  const [editorWidth, setEditorWidth] = useState<number | null>(loadEditorWidth);
 
   // The SSE handlers and async loads read these refs, not stale state.
   const pidRef = useRef<string | null>(null);
@@ -322,7 +386,7 @@ function App() {
         <ThemeSwitch />
       </header>
 
-      <div class="content">
+      <div class="content" style={{ "--editor-width": `${editorWidth ?? EDITOR_DEFAULT_WIDTH}px` }}>
         <main class="main">
           {projectsError && (
             <div class="notice notice-error" role="alert">
@@ -378,6 +442,15 @@ function App() {
           )}
         </main>
 
+        {pid !== null && config && openId !== null && openInitial !== null && (
+          <EditorResizer
+            width={editorWidth ?? EDITOR_DEFAULT_WIDTH}
+            onWidth={(w, save) => {
+              setEditorWidth(w);
+              if (save) saveEditorWidth(w);
+            }}
+          />
+        )}
         {pid !== null && config && openId !== null && openInitial !== null && (
           <TaskEditor
             key={openId}

@@ -151,6 +151,18 @@ export function assigneeLabel(assignee: Assignee): string {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Editor width
+
+export const EDITOR_DEFAULT_WIDTH = 420;
+export const EDITOR_MIN_WIDTH = 320;
+
+/** The editor width in px: at least EDITOR_MIN_WIDTH, at most half of the window area `total`. */
+export function clampEditorWidth(width: number, total: number): number {
+  const max = Math.max(EDITOR_MIN_WIDTH, Math.floor(total / 2));
+  return Math.round(Math.min(max, Math.max(EDITOR_MIN_WIDTH, width)));
+}
+
+// ---------------------------------------------------------------------------------------------
 // Live updates (design 7.3)
 
 export type EventPlan =
