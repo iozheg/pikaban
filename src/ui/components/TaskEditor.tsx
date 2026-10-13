@@ -356,14 +356,22 @@ export function TaskEditor(props: TaskEditorProps) {
                 </p>
               </>
             ) : (
-              // A click anywhere in the text starts editing (the click on the pencil button bubbles up to here);
-              // the pencil button is the keyboard way.
-              <div class="preview" onClick={() => setEditing(true)}>
-                <button type="button" class="body-edit" aria-label="Edit the description" title="Edit">
+              // Only the pencil starts editing, so the rendered text can be selected and copied; an empty
+              // description has nothing to select, so a click on it starts editing too.
+              <div class="preview">
+                <button
+                  type="button"
+                  class="body-edit"
+                  aria-label="Edit the description"
+                  title="Edit"
+                  onClick={() => setEditing(true)}
+                >
                   <PencilIcon />
                 </button>
                 {s.draft.body.trim() === "" ? (
-                  <p class="preview-empty">No description. Click to add one.</p>
+                  <p class="preview-empty" onClick={() => setEditing(true)}>
+                    No description. Click to add one.
+                  </p>
                 ) : (
                   <div class="markdown" dangerouslySetInnerHTML={{ __html: preview }} />
                 )}

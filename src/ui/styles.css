@@ -961,16 +961,12 @@ body.is-resizing {
   margin: 0 -8px;
   padding: 6px 38px 6px 8px;
   border-radius: 6px;
-  cursor: text;
   overflow-wrap: anywhere;
-}
-
-.preview:hover {
-  background: var(--surface-2);
 }
 
 .preview-empty {
   margin: 0;
+  cursor: text;
   color: var(--text-muted);
   font-style: italic;
 }
