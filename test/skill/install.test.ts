@@ -53,7 +53,7 @@ describe("the skill text", () => {
 
   it("names a command for each skill and each protocol rule, and the init flags", () => {
     const text = packagedSkill();
-    for (const s of ["add_task", "do_task", "update_task", "elaborate_task", "remove_task"]) expect(text).toContain(s);
+    for (const s of ["add_task", "do_task", "do_tasks", "update_task", "elaborate_task", "remove_task"]) expect(text).toContain(s);
     for (const cmd of ["pikaban add", "pikaban move", "pikaban set", "pikaban note", "pikaban delete", "pikaban show"]) {
       expect(text).toContain(cmd);
     }

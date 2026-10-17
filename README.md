@@ -2,13 +2,19 @@
 
 # pikaban
 
-A local task tracker for one person and one AI coding agent (Claude Code) working on the same project. Tasks are Markdown files in a hidden `.pikaban/` folder in your project; the agent changes them through the `pikaban` CLI, and you see them on a Kanban board in your browser (`pikaban ui`).
+A local simple task tracker for you and your agent. Manage tasks in your browser or with agent commands.
 
-Design and rationale: [docs/design.md](docs/design.md). Implementation plan: [docs/implementation-plan.md](docs/implementation-plan.md).
+## Human written for you
 
-## Install
+Features:
 
-You need **Node.js 20 or later** for the CLI.
+- minimum features, super simple
+- markdown files in project
+- Kanban board in browser
+- agent skill
+- multiple projects
+
+## Usage
 
 ```sh
 npm install -g pikaban
@@ -45,12 +51,12 @@ pikaban ui
 
 `pikaban init` makes `.pikaban/` with `config.json` and `tasks/`, and adds the project to your global project list (`~/.pikaban_config.json`). In a terminal it asks these questions, shows a summary and asks for confirmation:
 
-| Question | Answers | Default | Flag |
-|---|---|---|---|
-| Optional categories (a list of two) | Check with the arrow keys and space, confirm with enter | `backlog` | `--backlog` / `--no-backlog`, `--review` / `--no-review` |
-| Install the agent skill? | `project` (`<project>/.claude/skills/pikaban/`), `user` (`~/.claude/skills/pikaban/`), `none` | `project` | `--skill <answer>` |
-| Let the agent run `pikaban` without permission prompts? | yes / no | no | `--allow` / `--no-allow` |
-| Keep the pikaban files in git? (only in a git repository) | yes / no | yes | `--git` / `--no-git` |
+| Question                                                  | Answers                                                                                       | Default   | Flag                                                     |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------- | -------------------------------------------------------- |
+| Optional categories (a list of two)                       | Check with the arrow keys and space, confirm with enter                                       | `backlog` | `--backlog` / `--no-backlog`, `--review` / `--no-review` |
+| Install the agent skill?                                  | `project` (`<project>/.claude/skills/pikaban/`), `user` (`~/.claude/skills/pikaban/`), `none` | `project` | `--skill <answer>`                                       |
+| Let the agent run `pikaban` without permission prompts?   | yes / no                                                                                      | no        | `--allow` / `--no-allow`                                 |
+| Keep the pikaban files in git? (only in a git repository) | yes / no                                                                                      | yes       | `--git` / `--no-git`                                     |
 
 - **Categories.** `todo`, `in_progress` and `done` always exist. `backlog` (tasks for later) and `review` (the agent's finished tasks wait for your check before `done`) are optional. The board order is `backlog, todo, in_progress, review, done`. Change them later with `pikaban categories enable|disable backlog|review`.
 - Without a terminal (an agent, a script, CI), `pikaban init` never asks. Give `--skill` and `--allow` / `--no-allow`, or `--yes` for the defaults; otherwise it stops with exit code 2 and writes nothing. A missing category or git flag gives the default. Example: `pikaban init --skill project --no-allow`.
@@ -65,42 +71,42 @@ Global options (before or after the command name): `-C <path>` uses that project
 
 A `<ref>` is a short name (`task-0042`, `0042`, `42`) or the full 26-character ULID.
 
-| Command | Options | What it does |
-|---|---|---|
-| `pikaban init` | `--name <name>`, `--id <id>`, `--backlog` / `--no-backlog`, `--review` / `--no-review`, `--skill project\|user\|none`, `--allow` / `--no-allow`, `--git` / `--no-git`, `--yes` | Makes `.pikaban/` and `config.json`, registers the project, installs the skill and the permission rule |
-| `pikaban add <title>` | `--body <text>`, `--body-file <path>` (`-` for stdin), `--category <c>` | Makes a new task (default category: the first one in `config.json`) |
-| `pikaban list` | `--category <c>`, `--assignee agent\|user\|none`, `--needs-input` | Shows tasks |
-| `pikaban show <ref>` | | Shows one task with its body |
-| `pikaban move <ref> <category>` | `--assignee agent\|user\|none` | Changes the category (and the assignee) in one write |
-| `pikaban set <ref>` | `--title <t>`, `--assignee agent\|user\|none`, `--needs-input true\|false` | Changes frontmatter fields |
-| `pikaban note <ref> [text]` | `--file <path>` (`-` for stdin) | Adds text to the end of the body |
-| `pikaban delete <ref>` | | Deletes the task file |
-| `pikaban categories` | | Shows the categories (on, off, required) |
-| `pikaban categories enable\|disable <c>` | | Turns `backlog` or `review` on or off. Disable stops with code 1 while tasks are in the category |
-| `pikaban check` | `--fix` | Validates the config, all task files and the skill version. `--fix` gives a new short name to the newer task of each duplicate pair |
-| `pikaban migrate` | `--dry-run` | Changes all files to the schema version of the CLI |
-| `pikaban skill install` | `--project`, `--force`, `--allow` | Installs the agent skill into `~/.claude/skills/pikaban/` (or the project with `--project`) |
-| `pikaban projects add [path]` | | Adds a project folder to the global list (default: the current project) |
-| `pikaban projects remove [path]` | | Removes a project folder from the global list |
-| `pikaban projects list` | | Shows the project folders |
-| `pikaban ui` | `--port <n>`, `--no-open` | Starts the UI server and opens the board. With `--port`, a port in use is an error |
+| Command                                  | Options                                                                                                                                                                        | What it does                                                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `pikaban init`                           | `--name <name>`, `--id <id>`, `--backlog` / `--no-backlog`, `--review` / `--no-review`, `--skill project\|user\|none`, `--allow` / `--no-allow`, `--git` / `--no-git`, `--yes` | Makes `.pikaban/` and `config.json`, registers the project, installs the skill and the permission rule                              |
+| `pikaban add <title>`                    | `--body <text>`, `--body-file <path>` (`-` for stdin), `--category <c>`                                                                                                        | Makes a new task (default category: the first one in `config.json`)                                                                 |
+| `pikaban list`                           | `--category <c>`, `--assignee agent\|user\|none`, `--needs-input`                                                                                                              | Shows tasks                                                                                                                         |
+| `pikaban show <ref>`                     |                                                                                                                                                                                | Shows one task with its body                                                                                                        |
+| `pikaban move <ref> <category>`          | `--assignee agent\|user\|none`                                                                                                                                                 | Changes the category (and the assignee) in one write                                                                                |
+| `pikaban set <ref>`                      | `--title <t>`, `--assignee agent\|user\|none`, `--needs-input true\|false`                                                                                                     | Changes frontmatter fields                                                                                                          |
+| `pikaban note <ref> [text]`              | `--file <path>` (`-` for stdin)                                                                                                                                                | Adds text to the end of the body                                                                                                    |
+| `pikaban delete <ref>`                   |                                                                                                                                                                                | Deletes the task file                                                                                                               |
+| `pikaban categories`                     |                                                                                                                                                                                | Shows the categories (on, off, required)                                                                                            |
+| `pikaban categories enable\|disable <c>` |                                                                                                                                                                                | Turns `backlog` or `review` on or off. Disable stops with code 1 while tasks are in the category                                    |
+| `pikaban check`                          | `--fix`                                                                                                                                                                        | Validates the config, all task files and the skill version. `--fix` gives a new short name to the newer task of each duplicate pair |
+| `pikaban migrate`                        | `--dry-run`                                                                                                                                                                    | Changes all files to the schema version of the CLI                                                                                  |
+| `pikaban skill install`                  | `--project`, `--force`, `--allow`                                                                                                                                              | Installs the agent skill into `~/.claude/skills/pikaban/` (or the project with `--project`)                                         |
+| `pikaban projects add [path]`            |                                                                                                                                                                                | Adds a project folder to the global list (default: the current project)                                                             |
+| `pikaban projects remove [path]`         |                                                                                                                                                                                | Removes a project folder from the global list                                                                                       |
+| `pikaban projects list`                  |                                                                                                                                                                                | Shows the project folders                                                                                                           |
+| `pikaban ui`                             | `--port <n>`, `--no-open`                                                                                                                                                      | Starts the UI server and opens the board. With `--port`, a port in use is an error                                                  |
 
 ## Exit codes
 
-| Code | Meaning |
-|---|---|
-| 0 | Success |
-| 1 | General error |
-| 2 | Incorrect usage (also: `pikaban init` without a terminal and a missing flag) |
-| 3 | Task or project not found |
-| 4 | Short name has more than one task (the message shows the ULIDs) |
-| 5 | Conflict: a file changed during the operation, or an installed skill file has local changes |
-| 6 | Schema version of the project is different from the CLI |
-| 7 | Validation error |
+| Code | Meaning                                                                                     |
+| ---- | ------------------------------------------------------------------------------------------- |
+| 0    | Success                                                                                     |
+| 1    | General error                                                                               |
+| 2    | Incorrect usage (also: `pikaban init` without a terminal and a missing flag)                |
+| 3    | Task or project not found                                                                   |
+| 4    | Short name has more than one task (the message shows the ULIDs)                             |
+| 5    | Conflict: a file changed during the operation, or an installed skill file has local changes |
+| 6    | Schema version of the project is different from the CLI                                     |
+| 7    | Validation error                                                                            |
 
 ## Agent setup (Claude Code)
 
-**The skill.** The package contains a Claude Code skill (`SKILL.md`) that tells the agent how to work with tasks: which command to use for each action, the protocol rules (for example, never edit frontmatter by hand, do not start a task that needs input) and what to do for each exit code. The skill text ships with the CLI, so it always matches the installed commands.
+**The skill.** The package contains a Claude Code skill (`SKILL.md`) that tells the agent how to work with tasks: which command to use for each action, the protocol rules (for example, never edit frontmatter by hand, do not start a task that needs input) and what to do for each exit code. Ask for several tasks ("do tasks 41, 42 and 45", "work through the todo list") and the agent does them one by one, each in its own subagent. If a listed task is not ready (it needs input, is assigned to you, or is not in `todo`, `backlog` or the agent's `in_progress`), nothing starts until you approve. During the batch, a task that ends with questions does not stop it; a failed task does. The skill text ships with the CLI, so it always matches the installed commands.
 
 - Project scope: `<project>/.claude/skills/pikaban/SKILL.md`. Commit it if teammates or cloud sessions should get it.
 - User scope: `~/.claude/skills/pikaban/SKILL.md`, for all your projects.
@@ -122,12 +128,12 @@ npm install -g pikaban
 
 ## Files on disk
 
-| Path | Content |
-|---|---|
-| `<project>/.pikaban/config.json` | `schema_version`, `project_id`, `project_name` and `categories` (the Kanban columns; must contain `todo`, `in_progress` and `done`; the first one is the default for new tasks) |
-| `<project>/.pikaban/tasks/task-XXXX-<ULID>.md` | One file per task: YAML frontmatter (`id`, `short`, `title`, `category`, `assignee`, `needs_input`, `created_at`, `updated_at`) and a free Markdown body. Only `pikaban` and the UI write the frontmatter; you and the agent can edit the body directly |
-| `~/.pikaban_config.json` | The list of project folders that the UI shows |
-| `<project>/.claude/skills/pikaban/SKILL.md`, `<project>/.claude/settings.json` | The project skill and the permission rule (if selected) |
+| Path                                                                           | Content                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<project>/.pikaban/config.json`                                               | `schema_version`, `project_id`, `project_name` and `categories` (the Kanban columns; must contain `todo`, `in_progress` and `done`; the first one is the default for new tasks)                                                                         |
+| `<project>/.pikaban/tasks/task-XXXX-<ULID>.md`                                 | One file per task: YAML frontmatter (`id`, `short`, `title`, `category`, `assignee`, `needs_input`, `created_at`, `updated_at`) and a free Markdown body. Only `pikaban` and the UI write the frontmatter; you and the agent can edit the body directly |
+| `~/.pikaban_config.json`                                                       | The list of project folders that the UI shows                                                                                                                                                                                                           |
+| `<project>/.claude/skills/pikaban/SKILL.md`, `<project>/.claude/settings.json` | The project skill and the permission rule (if selected)                                                                                                                                                                                                 |
 
 `PIKABAN_HOME` changes the home folder that pikaban uses: the folder of `.pikaban_config.json` and of `.claude/` for the user skill and the user `settings.json`. Example: `PIKABAN_HOME=/tmp/pikaban-home pikaban projects list`. The tests use it so they never touch your real files.
 

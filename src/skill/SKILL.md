@@ -1,6 +1,6 @@
 ---
 name: pikaban
-description: Manage the tasks of this project with the `pikaban` CLI. Use this skill for any work with project tasks or the `.pikaban/` folder - the backlog, the todo list, the Kanban board - and to add, list, show, start, do, update, elaborate (ask questions about), move, finish or remove a task, or when the user names a task such as task-0042.
+description: Manage the tasks of this project with the `pikaban` CLI. Use this skill for any work with project tasks or the `.pikaban/` folder - the backlog, the todo list, the Kanban board - and to add, list, show, start, do, update, elaborate (ask questions about), move, finish or remove a task, or when the user names a task such as task-0042. Also use it to do several tasks one by one (a list of tasks, "work through the todo list", "do all todo tasks").
 ---
 
 <!-- pikaban-skill-version: {{version}} -->
@@ -26,6 +26,7 @@ Always add `--json` when you read. The JSON output is stable; the human text is 
 |---|---|
 | `add_task` | `pikaban add "<title>" --category <c> [--body "<text>" \| --body-file <path>]` (see "New tasks") |
 | `do_task` | `pikaban move <ref> in_progress --assignee agent`, then do the work, then `pikaban move <ref> review` if the config has `review`, otherwise `pikaban move <ref> done` |
+| `do_tasks` | `do_task` for each task of a list, one by one, each in its own subagent (see "Several tasks") |
 | `update_task` | `pikaban set <ref> [--title "<t>"] [--assignee agent\|user\|none] [--needs-input true\|false]`, or `pikaban note <ref> "<text>"` |
 | `elaborate_task` | `pikaban note <ref> "<questions>"`, then `pikaban set <ref> --needs-input true` |
 | `remove_task` | `pikaban delete <ref>` |
@@ -42,6 +43,31 @@ Select the category from what the user asks:
 If the config has `review`, the user moves reviewed tasks from `review` to `done`. Do not move your own tasks to `done` unless the user tells you to.
 
 For long or multi-line text, use stdin: `pikaban note <ref> --file -` or `pikaban add "<title>" --body-file -`.
+
+## Several tasks
+
+When the user asks for several tasks, do each task in its own subagent. Your context then keeps only a short report for each task.
+
+- **The list.** Use the tasks the user names, in that order. For "all todo tasks" (or "work through the todo list"), use `pikaban list --category todo --json`, sorted by short name.
+- **Before you start.** Run `pikaban show <ref> --json` for each task. A task is ready when all of these are true:
+  - `category` is `todo` or `backlog`, or `category` is `in_progress` and `assignee` is `agent` (a task from a stopped session, rule 7).
+  - `needs_input` is `false`.
+  - `assignee` is not `user`.
+- **A task is not ready.** Do not start any task. Show the user each task that is not ready and the reason (for example, "task-0002: category `review`"). Start only when the user approves: the batch without these tasks, or the full list after the user changes the tasks.
+- **One at a time.** Start one subagent (the Agent tool, `run_in_background: false`) and wait for its result before the next one. Do not start subagents in parallel: they share the working tree and the task files.
+- **The subagent's prompt.** Give the task ref and these instructions:
+  - Do the task with `do_task` of the pikaban skill: `pikaban show <ref> --json`, `pikaban move <ref> in_progress --assignee agent`, the work, then `pikaban move <ref> review` (if the config has `review`) or `pikaban move <ref> done`.
+  - Use the checks of the project (tests, typecheck, build) if its CLAUDE.md or README names them. The task is finished only when they pass.
+  - If the task needs answers from the user, use `elaborate_task` (`pikaban note`, then `pikaban set <ref> --needs-input true`) and stop.
+  - If you cannot finish the task, add the reason with `pikaban note <ref> "<reason>"`, leave the task in `in_progress` and stop.
+  - At the end, report in one or two lines: the task ref, its category, and the changed files.
+- **After each subagent.** Run `pikaban show <ref> --json`. Do not trust only the subagent's report.
+  - Category `review` or `done`: success. Continue with the next task.
+  - `needs_input` is `true`: the task waits for the user. Continue with the next task.
+  - Any other result (the task is still in `in_progress`, or the subagent stopped with an error): failure. Stop the batch. Do not start the next task.
+- **At the end** (or after a failure), report in one block: the finished tasks, the tasks with questions (the user answers them in the body), the failed task with its reason, and the tasks that you did not start.
+
+Do not commit between the tasks unless the user tells you to.
 
 ## Protocol rules
 
