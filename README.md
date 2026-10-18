@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/logo.png" alt="pikaban logo: a pika peeking over a kanban board" width="160" /></p>
+<p align="center"><img src="assets/logo.svg" alt="pikaban logo: a letter p with pika ears and eyes" width="128" /></p>
 
 # pikaban
 
