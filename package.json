@@ -2,7 +2,14 @@
   "name": "pikaban",
   "license": "MIT",
   "version": "0.1.0",
-  "description": "Local task tracker for one user and one AI coding agent",
+  "description": "A local simple task tracker for you and your agent.",
+  "author": "Aleksandr Netsev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iozheg/pikaban.git"
+  },
+  "homepage": "https://github.com/iozheg/pikaban#readme",
+  "bugs": "https://github.com/iozheg/pikaban/issues",
   "keywords": [
     "task-tracker",
     "kanban",
@@ -17,7 +24,8 @@
     "pikaban": "dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "AGENT_GUIDE.md"
   ],
   "engines": {
     "node": ">=20"
@@ -25,6 +33,7 @@
   "scripts": {
     "build": "tsup && vite build",
     "prepare": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test",
     "dev": "vite",
     "dev:cli": "tsup --watch",
     "test": "vitest run",
